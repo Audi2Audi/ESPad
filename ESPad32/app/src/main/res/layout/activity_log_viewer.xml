@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0A0A">
+
+    <!-- Toolbar -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:background="#1A1A1A" android:padding="8dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="Car Log"
+            android:textColor="#FFFFFF" android:textSize="16sp" android:textStyle="bold"
+            android:layout_gravity="center_vertical"/>
+        <Button android:id="@+id/btnShare" android:layout_width="wrap_content"
+            android:layout_height="36dp" android:text="📤 Share"
+            android:textSize="12sp" android:layout_marginEnd="6dp" style="@style/CarButton"/>
+        <Button android:id="@+id/btnClear" android:layout_width="wrap_content"
+            android:layout_height="36dp" android:text="🗑 Clear"
+            android:textSize="12sp" android:layout_marginEnd="6dp" style="@style/CarButton"/>
+        <Button android:id="@+id/btnClose" android:layout_width="wrap_content"
+            android:layout_height="36dp" android:text="✕ Close"
+            android:textSize="12sp" style="@style/CarButton"/>
+    </LinearLayout>
+
+    <!-- Log text -->
+    <ScrollView android:id="@+id/scrollView"
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:padding="8dp">
+        <TextView android:id="@+id/tvLog"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textColor="#00FF88" android:textSize="11sp"
+            android:fontFamily="monospace" android:lineSpacingMultiplier="1.2"/>
+    </ScrollView>
+
+</LinearLayout>

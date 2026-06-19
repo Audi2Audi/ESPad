@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="#0A0A0A"
+    android:fitsSystemWindows="true"
+    android:padding="8dp"
+    android:paddingBottom="56dp">
+
+    <!-- Left side: both matrix grids stacked or side by side -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginEnd="8dp">
+
+        <!-- Grids row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <!-- Left eye -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginEnd="6dp">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="LEFT EYE"
+                    android:textColor="#00E5FF"
+                    android:textSize="11sp"
+                    android:gravity="center"
+                    android:layout_marginBottom="2dp"/>
+                <com.espad32.controller.MatrixGridView
+                    android:id="@+id/leftMatrixView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#111111"/>
+            </LinearLayout>
+
+            <!-- Right eye -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="RIGHT EYE"
+                    android:textColor="#00E5FF"
+                    android:textSize="11sp"
+                    android:gravity="center"
+                    android:layout_marginBottom="2dp"/>
+                <com.espad32.controller.MatrixGridView
+                    android:id="@+id/rightMatrixView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#111111"/>
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Quick patterns below grids -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Quick Patterns"
+            android:textColor="#888"
+            android:textSize="11sp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="4dp"/>
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/quickPatterns"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="2dp"/>
+        </HorizontalScrollView>
+
+    </LinearLayout>
+
+    <!-- Right side: title, mode, controls -->
+    <LinearLayout
+        android:layout_width="220dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="32dp"
+        android:paddingEnd="16dp">
+
+        <!-- Title + close -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="LED Canvas"
+                android:textColor="#00E5FF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_gravity="center_vertical"/>
+            <Button
+                android:id="@+id/btnClose"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:text="✕"
+                android:textSize="12sp"
+                style="@style/CarButton"/>
+        </LinearLayout>
+
+        <!-- Mode spinner -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mode:"
+            android:textColor="#888"
+            android:textSize="11sp"
+            android:layout_marginBottom="2dp"/>
+        <Spinner
+            android:id="@+id/spinnerDrawMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:backgroundTint="#00E5FF"
+            android:popupBackground="#1A1A1A"/>
+
+        <!-- Mode label -->
+        <TextView
+            android:id="@+id/tvEyeLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Both eyes"
+            android:textColor="#AAAAAA"
+            android:textSize="10sp"
+            android:layout_marginBottom="12dp"/>
+
+        <!-- Spacer -->
+        <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+
+        <!-- Action buttons -->
+        <Button
+            android:id="@+id/btnClearAll"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="🗑 Clear"
+            android:textSize="11sp"
+            android:layout_marginBottom="6dp"
+            style="@style/CarButton"/>
+        <Button
+            android:id="@+id/btnFill"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="⬛ Fill"
+            android:textSize="11sp"
+            android:layout_marginBottom="6dp"
+            style="@style/CarButton"/>
+        <Button
+            android:id="@+id/btnInvert"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:text="⇄ Invert"
+            android:textSize="11sp"
+            android:layout_marginBottom="8dp"
+            style="@style/CarButton"/>
+        <Button
+            android:id="@+id/btnSendPattern"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:text="▶ Send"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:backgroundTint="#D82F2E"
+            style="@style/CarButton"/>
+
+    </LinearLayout>
+
+</LinearLayout>

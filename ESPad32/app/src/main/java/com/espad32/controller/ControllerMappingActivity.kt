@@ -1,0 +1,457 @@
+package com.espad32.controller
+
+import android.app.AlertDialog
+import android.os.Bundle
+import android.view.*
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+
+class ControllerMappingActivity : AppCompatActivity() {
+
+    private lateinit var tabPresets: TextView
+    private lateinit var tabButtons: TextView
+    private lateinit var tabAxes: TextView
+    private lateinit var tabAdvanced: TextView
+    private lateinit var tabPinRef: TextView
+    private lateinit var contentArea: LinearLayout
+
+    // For detect-button dialog
+    private var detectDialog: AlertDialog? = null
+    private var detectCallback: ((Int, String) -> Unit)? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_controller_mapping)
+
+        tabPresets  = findViewById(R.id.tabPresets)
+        tabButtons  = findViewById(R.id.tabButtons)
+        tabAxes     = findViewById(R.id.tabAxes)
+        tabAdvanced = findViewById(R.id.tabAdvanced)
+        tabPinRef   = findViewById(R.id.tabPinRef)
+        contentArea = findViewById(R.id.mappingContent)
+
+        tabPresets.setOnClickListener  { showTab(0) }
+        tabButtons.setOnClickListener  { showTab(1) }
+        tabAxes.setOnClickListener     { showTab(2) }
+        tabAdvanced.setOnClickListener { showTab(3) }
+        tabPinRef.setOnClickListener   { showTab(4) }
+
+        findViewById<Button>(R.id.btnMappingClose).setOnClickListener { finish() }
+
+        showTab(0)
+    }
+
+    private fun showTab(tab: Int) {
+        val cyan = getColor(android.R.color.holo_blue_light)
+        val grey = 0xFF888888.toInt()
+        listOf(tabPresets, tabButtons, tabAxes, tabAdvanced, tabPinRef)
+            .forEachIndexed { i, tv -> tv.setTextColor(if (i == tab) cyan else grey) }
+        contentArea.removeAllViews()
+        when (tab) {
+            0 -> buildPresetsTab()
+            1 -> buildButtonsTab()
+            2 -> buildAxesTab()
+            3 -> buildAdvancedTab()
+            4 -> buildPinRefTab()
+        }
+    }
+
+    // ── Presets tab ───────────────────────────────────────────────────
+    private fun buildPresetsTab() {
+        contentArea.removeAllViews()
+        ControllerMapping.PRESETS.forEach { profile ->
+            val row = layoutInflater.inflate(R.layout.item_preset_row, contentArea, false)
+            row.findViewById<TextView>(R.id.tvPresetName).text = profile.name
+            row.findViewById<TextView>(R.id.tvPresetDesc).text = presetDescription(profile)
+            val btn = row.findViewById<Button>(R.id.btnApplyPreset)
+            btn.text = if (profile.name == ControllerMapping.activeProfileName) "✓ Active" else "Apply"
+            btn.setOnClickListener {
+                ControllerMapping.applyPreset(profile)
+                buildPresetsTab()  // refresh
+                Toast.makeText(this, "${profile.name} applied", Toast.LENGTH_SHORT).show()
+            }
+            contentArea.addView(row)
+        }
+    }
+
+    private fun presetDescription(profile: ControllerProfile): String {
+        val drive = profile.axes.find {
+            it.function == AxisFunction.DRIVE ||
+            it.function == AxisFunction.TRIGGER_DRIVE
+        }?.label ?: "—"
+        val pan = profile.axes.find { it.function == AxisFunction.PAN_TILT }?.label ?: "—"
+        return "Drive: $drive  |  Pan/Tilt: $pan"
+    }
+
+    // ── Buttons tab ───────────────────────────────────────────────────
+    private fun buildButtonsTab() {
+        contentArea.removeAllViews()
+        val hint = TextView(this).apply {
+            text = "Tap a row to remap it. Use 'Detect' to press a physical button."
+            textSize = 11f; setTextColor(0xFF888888.toInt())
+            setPadding(0, 0, 0, 16)
+        }
+        contentArea.addView(hint)
+
+        ControllerMapping.buttons.forEachIndexed { index, mapping ->
+            val row = layoutInflater.inflate(R.layout.item_button_row, contentArea, false)
+            row.findViewById<TextView>(R.id.tvButtonName).text = mapping.label
+            row.findViewById<TextView>(R.id.tvButtonFunction).text = mapping.function.label
+            row.setOnClickListener { showButtonEditDialog(index, mapping) }
+            contentArea.addView(row)
+        }
+    }
+
+    private fun showButtonEditDialog(index: Int, mapping: ButtonMapping) {
+        val view = layoutInflater.inflate(R.layout.dialog_button_mapping, null)
+        val tvTarget  = view.findViewById<TextView>(R.id.tvMappingTarget)
+        val spinner   = view.findViewById<Spinner>(R.id.spinnerFunction)
+        val btnDetect = view.findViewById<Button>(R.id.btnDetect)
+
+        tvTarget.text = "Remapping: ${mapping.label}"
+
+        val functions = ButtonFunction.values()
+        val adapter = ArrayAdapter(this,
+            android.R.layout.simple_spinner_item,
+            functions.map { it.label })
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+        spinner.setSelection(functions.indexOf(mapping.function))
+
+        btnDetect.setOnClickListener {
+            showDetectDialog { detectedKeyCode, detectedLabel ->
+                // Find if this keycode exists in our mapping list
+                val existingIdx = ControllerMapping.buttons.indexOfFirst { it.keyCode == detectedKeyCode }
+                if (existingIdx >= 0) {
+                    tvTarget.text = "Remapping: ${ControllerMapping.buttons[existingIdx].label}"
+                    // Show edit for detected button
+                    showButtonEditDialog(existingIdx, ControllerMapping.buttons[existingIdx])
+                } else {
+                    tvTarget.text = "Detected: $detectedLabel (keyCode $detectedKeyCode)"
+                }
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Button Mapping")
+            .setView(view)
+            .setPositiveButton("Save") { _, _ ->
+                val selected = functions[spinner.selectedItemPosition]
+                android.util.Log.d("ESPad32", "Saving button[$index] ${mapping.label} -> ${selected.label}")
+                android.util.Log.d("ESPad32", "Before: ${ControllerMapping.buttons[index].function.label}")
+                ControllerMapping.updateButton(index, selected, this)
+                android.util.Log.d("ESPad32", "After: ${ControllerMapping.buttons[index].function.label}")
+                android.util.Log.d("ESPad32", "functionForKey(${mapping.keyCode}): ${ControllerMapping.functionForKey(mapping.keyCode).label}")
+                showTab(1)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showDetectDialog(callback: (Int, String) -> Unit) {
+        detectCallback = callback
+        val tv = TextView(this).apply {
+            text = "Press any button on your controller now…"
+            textSize = 14f; gravity = android.view.Gravity.CENTER
+            setPadding(48, 48, 48, 48)
+        }
+        detectDialog = AlertDialog.Builder(this)
+            .setTitle("Detecting Button")
+            .setView(tv)
+            .setNegativeButton("Cancel") { _, _ -> detectCallback = null }
+            .show()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val cb = detectCallback
+        if (cb != null && event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD) {
+            detectCallback = null
+            detectDialog?.dismiss()
+            val name = KeyEvent.keyCodeToString(keyCode)
+                .replace("KEYCODE_BUTTON_", "")
+                .replace("KEYCODE_DPAD_", "D-Pad ")
+                .replace("_", " ")
+                .lowercase()
+                .replaceFirstChar { it.uppercase() }
+            cb(keyCode, name)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    // ── Axes tab ──────────────────────────────────────────────────────
+    private fun buildAxesTab() {
+        contentArea.removeAllViews()
+        val hint = TextView(this).apply {
+            text = "Assign which stick controls drive or camera pan/tilt."
+            textSize = 11f; setTextColor(0xFF888888.toInt())
+            setPadding(0, 0, 0, 16)
+        }
+        contentArea.addView(hint)
+
+        ControllerMapping.axes.forEachIndexed { index, mapping ->
+            val row = layoutInflater.inflate(R.layout.item_button_row, contentArea, false)
+            row.findViewById<TextView>(R.id.tvButtonName).text = mapping.label
+            row.findViewById<TextView>(R.id.tvButtonFunction).text = mapping.function.label
+            row.setOnClickListener { showAxisEditDialog(index, mapping) }
+            contentArea.addView(row)
+        }
+    }
+
+    private fun showAxisEditDialog(index: Int, mapping: AxisMapping) {
+        val functions = AxisFunction.values()
+        val adapter = ArrayAdapter(this,
+            android.R.layout.simple_spinner_item,
+            functions.map { it.label })
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+
+        val spinner = Spinner(this)
+        spinner.adapter = adapter
+        spinner.setSelection(functions.indexOf(mapping.function))
+
+        AlertDialog.Builder(this)
+            .setTitle("Axis: ${mapping.label}")
+            .setView(spinner)
+            .setPositiveButton("Save") { _, _ ->
+                ControllerMapping.updateAxis(index, functions[spinner.selectedItemPosition], this)
+                showTab(2)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // ── Advanced tab ──────────────────────────────────────────────────
+    private fun buildAdvancedTab() {
+        val prefs = getSharedPreferences("ESPad32Prefs", MODE_PRIVATE)
+
+        addSectionHeader("MOTOR SPEED CURVE")
+        addHint("Linear: direct stick-to-speed mapping.\nExponential: slow near centre for precision, fast at extremes.")
+        val curveGroup = android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 16.dp }
+        }
+        val rbLinear = android.widget.RadioButton(this).apply {
+            text = "Linear"; setTextColor(0xFFCCCCCC.toInt()); textSize = 13f
+            id = android.view.View.generateViewId()
+            buttonTintList = android.content.res.ColorStateList.valueOf(0xFF00E5FF.toInt())
+        }
+        val rbExpo = android.widget.RadioButton(this).apply {
+            text = "Exponential"; setTextColor(0xFFCCCCCC.toInt()); textSize = 13f
+            id = android.view.View.generateViewId()
+            buttonTintList = android.content.res.ColorStateList.valueOf(0xFF00E5FF.toInt())
+        }
+        curveGroup.addView(rbLinear); curveGroup.addView(rbExpo)
+        if (prefs.getString("speedCurve", "linear") == "linear") rbLinear.isChecked = true
+        else rbExpo.isChecked = true
+        curveGroup.setOnCheckedChangeListener { _, id ->
+            prefs.edit().putString("speedCurve", if (id == rbLinear.id) "linear" else "exponential").apply()
+        }
+        contentArea.addView(curveGroup)
+        addDivider()
+
+        addSectionHeader("AUTO-STOP TIMEOUT")
+        addHint("Stop motors if no drive command is received within this time. 0 = disabled.")
+        val timeoutMs = prefs.getInt("autoStopMs", 500)
+        val tvTimeoutVal = addLabelValue("Timeout", formatTimeout(timeoutMs))
+        val sbTimeout = android.widget.SeekBar(this).apply {
+            max = 10; progress = timeoutToSlider(timeoutMs)
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF00E5FF.toInt())
+            thumbTintList    = android.content.res.ColorStateList.valueOf(0xFF00E5FF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 16.dp }
+        }
+        sbTimeout.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: android.widget.SeekBar, v: Int, u: Boolean) {
+                val ms = sliderToTimeout(v); tvTimeoutVal.text = formatTimeout(ms)
+                prefs.edit().putInt("autoStopMs", ms).apply()
+            }
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
+        })
+        contentArea.addView(sbTimeout)
+        addDivider()
+
+        addSectionHeader("CAMERA RESOLUTION")
+        addHint("Lower = smoother stream. Higher = more detail. Takes effect on next connection.")
+        val resolutions = listOf("QQVGA (160×120)", "QVGA (320×240)", "VGA (640×480)", "SVGA (800×600)")
+        val resCodes    = listOf("QQVGA", "QVGA", "VGA", "SVGA")
+        val currentRes  = prefs.getString("cameraRes", "QVGA") ?: "QVGA"
+        val spinner = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(context, android.R.layout.simple_spinner_item, resolutions).also {
+                it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+            setSelection(resCodes.indexOf(currentRes).coerceAtLeast(0))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(0xFF00E5FF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 20.dp }
+            onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p: android.widget.AdapterView<*>, v: android.view.View?, pos: Int, id: Long) {
+                    prefs.edit().putString("cameraRes", resCodes[pos]).apply()
+                }
+                override fun onNothingSelected(p: android.widget.AdapterView<*>) {}
+            }
+        }
+        contentArea.addView(spinner)
+        addDivider()
+
+        Button(this).apply {
+            text = "↺  Reset Advanced Defaults"; textSize = 12f; isAllCaps = false
+            setBackgroundResource(R.drawable.btn_car_bg); setTextColor(0xFFFFFFFF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 44.dp)
+            setOnClickListener {
+                prefs.edit().putString("speedCurve","linear").putInt("autoStopMs",500)
+                    .putString("cameraRes","QVGA").apply()
+                buildAdvancedTab()
+            }
+        }.also { contentArea.addView(it) }
+    }
+
+    // ── Pin Reference tab ─────────────────────────────────────────────
+    private fun buildPinRefTab() {
+        addSectionHeader("I²C BUS (PCA9685 + LED Matrix)")
+        pinRow("SDA", "GPIO 13", "Servo driver + LED matrix data")
+        pinRow("SCL", "GPIO 14", "Servo driver + LED matrix clock")
+        pinRow("PCA9685 Address", "0x5F", "Servo / motor PWM driver")
+        pinRow("VK16K33 Address", "0x71", "Dual 8×8 LED matrix")
+        addDivider()
+        addSectionHeader("SERVO (via PCA9685)")
+        pinRow("Pan Servo",  "PCA9685 Ch 0", "Camera pan (servo 1)")
+        pinRow("Tilt Servo", "PCA9685 Ch 1", "Camera tilt (servo 2)")
+        addDivider()
+        addSectionHeader("MOTORS (via PCA9685)")
+        pinRow("M1 IN1 / IN2", "Ch 15 / 14", "Front-left motor")
+        pinRow("M2 IN1 / IN2", "Ch 9 / 8",   "Front-right motor")
+        pinRow("M3 IN1 / IN2", "Ch 12 / 13", "Rear-left motor")
+        pinRow("M4 IN1 / IN2", "Ch 10 / 11", "Rear-right motor")
+        addDivider()
+        addSectionHeader("DIRECT GPIO")
+        pinRow("WS2812 LEDs", "GPIO 32", "RGB LED strip data")
+        pinRow("Buzzer",      "GPIO 2",  "Active buzzer / horn")
+        pinRow("Battery ADC", "GPIO 32", "Voltage divider input")
+        pinRow("PCF8574 SDA", "GPIO 13", "Line tracker I²C data")
+        pinRow("PCF8574 SCL", "GPIO 14", "Line tracker I²C clock")
+        addDivider()
+        addSectionHeader("OV2640 CAMERA")
+        pinRow("XCLK",   "GPIO 21", "Camera clock")
+        pinRow("SIOD",   "GPIO 26", "SCCB data")
+        pinRow("SIOC",   "GPIO 27", "SCCB clock")
+        pinRow("VSYNC",  "GPIO 25", "Vertical sync")
+        pinRow("HREF",   "GPIO 23", "Horizontal reference")
+        pinRow("PCLK",   "GPIO 22", "Pixel clock")
+        pinRow("Y9..Y2", "35,34,39,36,19,18,5,4", "Pixel data bus")
+        addDivider()
+        addSectionHeader("WiFi / TCP")
+        pinRow("AP SSID",     "ESPad_32",     "Access point name")
+        pinRow("AP Password", "ESPad_32",     "Access point password")
+        pinRow("AP IP",       "192.168.4.1", "Default app IP")
+        pinRow("Cmd Port",    "4000",        "Command socket")
+        pinRow("Camera Port", "7000",        "Camera stream socket")
+        contentArea.addView(TextView(this).apply {
+            text = "ℹ  Read-only. Reflects current sketch header definitions."
+            textSize = 10f; setTextColor(0xFF555555.toInt()); setPadding(0,16,0,0)
+        })
+    }
+
+    // ── Shared helpers ────────────────────────────────────────────────
+    private fun addSliderPref(prefs: android.content.SharedPreferences, key: String,
+                               label: String, default: Int, min: Int, max: Int, scale: Float) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 4.dp }
+        }
+        val currentVal = if (scale == 1.6f) ((prefs.getFloat(key, default * scale) / scale).toInt())
+                         else ((prefs.getFloat(key, default * scale) / scale).toInt())
+        val tvLabel = TextView(this).apply {
+            text = label; textSize = 12f; setTextColor(0xFFCCCCCC.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val tvVal = TextView(this).apply {
+            text = "$currentVal"; textSize = 12f; setTextColor(0xFF00E5FF.toInt())
+            gravity = android.view.Gravity.END
+            layoutParams = LinearLayout.LayoutParams(32.dp, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        row.addView(tvLabel); row.addView(tvVal)
+        contentArea.addView(row)
+        val sb = android.widget.SeekBar(this).apply {
+            this.max = max - min; progress = currentVal - min
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF00E5FF.toInt())
+            thumbTintList    = android.content.res.ColorStateList.valueOf(0xFF00E5FF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 12.dp }
+        }
+        sb.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: android.widget.SeekBar, v: Int, u: Boolean) {
+                val newVal = v + min; tvVal.text = "$newVal"
+                prefs.edit().putFloat(key, newVal * scale).apply()
+            }
+            override fun onStartTrackingTouch(s: android.widget.SeekBar) {}
+            override fun onStopTrackingTouch(s: android.widget.SeekBar) {}
+        })
+        contentArea.addView(sb)
+    }
+
+    private fun addSectionHeader(text: String) {
+        contentArea.addView(TextView(this).apply {
+            this.text = text; textSize = 10f; setTextColor(0xFF666666.toInt())
+            letterSpacing = 0.1f; setPadding(0, 0, 0, 8)
+        })
+    }
+    private fun addHint(text: String) {
+        contentArea.addView(TextView(this).apply {
+            this.text = text; textSize = 11f; setTextColor(0xFF777777.toInt())
+            setPadding(0, 0, 0, 12)
+        })
+    }
+    private fun addDivider() {
+        contentArea.addView(android.view.View(this).apply {
+            setBackgroundColor(0xFF333333.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
+                topMargin = 8; bottomMargin = 16
+            }
+        })
+    }
+    private fun addLabelValue(label: String, value: String): TextView {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 6.dp }
+        }
+        row.addView(TextView(this).apply {
+            text = label; textSize = 13f; setTextColor(0xFFCCCCCC.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        val tvVal = TextView(this).apply {
+            text = value; textSize = 13f; setTextColor(0xFF00E5FF.toInt())
+            gravity = android.view.Gravity.END
+        }
+        row.addView(tvVal); contentArea.addView(row); return tvVal
+    }
+    private fun pinRow(label: String, pin: String, description: String) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(0xFF1A1A1A.toInt()); setPadding(12, 10, 12, 10)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 3.dp }
+        }
+        row.addView(TextView(this).apply {
+            text = label; textSize = 12f; setTextColor(0xFFCCCCCC.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.2f)
+        })
+        row.addView(TextView(this).apply {
+            text = pin; textSize = 12f; setTextColor(0xFF00E5FF.toInt())
+            typeface = android.graphics.Typeface.MONOSPACE
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        row.addView(TextView(this).apply {
+            text = description; textSize = 11f; setTextColor(0xFF666666.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.8f)
+        })
+        contentArea.addView(row)
+    }
+    private val timeoutValues = listOf(0,200,500,1000,2000,3000,5000,10000,20000,30000,60000)
+    private fun sliderToTimeout(v: Int) = timeoutValues.getOrElse(v) { 500 }
+    private fun timeoutToSlider(ms: Int) = timeoutValues.indexOfFirst { it >= ms }.coerceAtLeast(0)
+    private fun formatTimeout(ms: Int) = if (ms == 0) "Off" else if (ms < 1000) "${ms}ms" else "${ms/1000}s"
+    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
+}
