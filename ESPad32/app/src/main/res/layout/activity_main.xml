@@ -17,9 +17,9 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
-    <!-- Logo shown when camera not connected. Bottom is constrained to the control
-         panel's top (not the screen edge) so the logo centers in the visible space
-         above the buttons tray and is never covered by it. -->
+    <!-- Logo shown when camera not connected. Top is constrained to the status bar's
+         bottom (not the screen edge) and bottom to the control panel's top, so the
+         logo centers in the visible space between them and never touches either. -->
     <LinearLayout
         android:id="@+id/cameraPlaceholder"
         android:layout_width="0dp"
@@ -27,7 +27,7 @@
         android:orientation="vertical"
         android:gravity="center"
         android:background="#000000"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/statusBar"
         app:layout_constraintBottom_toTopOf="@id/controlPanel"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
