@@ -95,11 +95,64 @@ object Boards {
         )
     )
 
-    // Future boards get added here as their own BoardDef entries, e.g.:
-    // val ESP32_DEVKIT = BoardDef(key = "esp32_devkit", ...)
-    // val ARDUINO_UNO   = BoardDef(key = "arduino_uno", ...)
+    // Common 38-pin DOIT ESP32 DEVKIT V1 layout. Same WROOM-32 chip and
+    // GPIO restrictions as the D1 Mini32, but breaks out more pins —
+    // including the flash pins (6-11), which are physically present as
+    // header pins on this board but still reserved/unusable.
+    // NOTE: pinout varies by seller/silkscreen — verify against the
+    // specific board in hand before relying on this for a real build.
+    val ESP32_DEVKIT_V1 = BoardDef(
+        key = "esp32_devkit_v1",
+        displayName = "ESP32 DevKit V1 (38-pin)",
+        leftHeader = listOf(
+            BoardPin("3V3", null, null),
+            BoardPin("EN", null, null),
+            BoardPin("VP", 36, PinStatus.INPUT_ONLY),
+            BoardPin("VN", 39, PinStatus.INPUT_ONLY),
+            BoardPin("34", 34, PinStatus.INPUT_ONLY),
+            BoardPin("35", 35, PinStatus.INPUT_ONLY),
+            BoardPin("32", 32, PinStatus.AVAILABLE),
+            BoardPin("33", 33, PinStatus.AVAILABLE),
+            BoardPin("25", 25, PinStatus.AVAILABLE),
+            BoardPin("26", 26, PinStatus.AVAILABLE),
+            BoardPin("27", 27, PinStatus.AVAILABLE),
+            BoardPin("14", 14, PinStatus.AVAILABLE),
+            BoardPin("12", 12, PinStatus.STRAPPING),
+            BoardPin("GND", null, null),
+            BoardPin("13", 13, PinStatus.AVAILABLE),
+            BoardPin("D2", 9, PinStatus.RESERVED),
+            BoardPin("D3", 10, PinStatus.RESERVED),
+            BoardPin("CMD", 11, PinStatus.RESERVED),
+            BoardPin("5V", null, null)
+        ),
+        rightHeader = listOf(
+            BoardPin("GND", null, null),
+            BoardPin("23", 23, PinStatus.AVAILABLE),
+            BoardPin("22", 22, PinStatus.AVAILABLE),
+            BoardPin("TX0", 1, PinStatus.UART),
+            BoardPin("RX0", 3, PinStatus.UART),
+            BoardPin("21", 21, PinStatus.AVAILABLE),
+            BoardPin("GND", null, null),
+            BoardPin("19", 19, PinStatus.AVAILABLE),
+            BoardPin("18", 18, PinStatus.AVAILABLE),
+            BoardPin("5", 5, PinStatus.AVAILABLE),
+            BoardPin("17", 17, PinStatus.AVAILABLE),
+            BoardPin("16", 16, PinStatus.AVAILABLE),
+            BoardPin("4", 4, PinStatus.AVAILABLE),
+            BoardPin("0", 0, PinStatus.STRAPPING),
+            BoardPin("2", 2, PinStatus.STRAPPING),
+            BoardPin("15", 15, PinStatus.STRAPPING),
+            BoardPin("D1", 8, PinStatus.RESERVED),
+            BoardPin("D0", 7, PinStatus.RESERVED),
+            BoardPin("CLK", 6, PinStatus.RESERVED)
+        )
+    )
 
-    val ALL = listOf(D1_MINI32)
+    // Future boards get added here as their own BoardDef entries, e.g.:
+    // val ESP32_S3_DEVKIT = BoardDef(key = "esp32_s3_devkit", ...)
+    // val ESP32_C3        = BoardDef(key = "esp32_c3", ...)
+
+    val ALL = listOf(D1_MINI32, ESP32_DEVKIT_V1)
 
     fun byKey(key: String): BoardDef = ALL.find { it.key == key } ?: D1_MINI32
 }

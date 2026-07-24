@@ -14,11 +14,13 @@ class PinMapperActivity : AppCompatActivity() {
 
     private lateinit var storage: PinConfigStorage
     private var currentProfile: DeviceProfile = Profiles.TRAIN
+    private var currentBoardKey: String = Profiles.TRAIN.boardKey
     private var assignments: MutableMap<String, Int?> = mutableMapOf()
     private var pendingRoleKey: String? = null
     private val logLines = mutableListOf<String>()
 
     private lateinit var profileTabContainer: LinearLayout
+    private lateinit var boardTabContainer: LinearLayout
     private lateinit var boardContainer: LinearLayout
     private lateinit var roleContainer: LinearLayout
     private lateinit var roleSectionLabel: TextView
@@ -32,6 +34,7 @@ class PinMapperActivity : AppCompatActivity() {
         storage = PinConfigStorage(this)
 
         profileTabContainer = findViewById(R.id.profileTabContainer)
+        boardTabContainer = findViewById(R.id.boardTabContainer)
         boardContainer = findViewById(R.id.boardContainer)
         roleContainer = findViewById(R.id.roleContainer)
         roleSectionLabel = findViewById(R.id.roleSectionLabel)
@@ -69,25 +72,93 @@ class PinMapperActivity : AppCompatActivity() {
 
     private fun loadProfile(profile: DeviceProfile) {
         currentProfile = profile
-        assignments = storage.load(profile.key, profile.defaults)
+        currentBoardKey = storage.loadSelectedBoard(profile.key, profile.boardKey)
+        assignments = storage.load(profile.key, currentBoardKey, profile.defaults)
         pendingRoleKey = null
         log("Loaded profile \"${profile.displayName}\".")
         buildProfileTabs()
+        buildBoardTabs()
+        renderBoard()
+        renderRoles()
+    }
+
+    private fun buildBoardTabs() {
+        boardTabContainer.removeAllViews()
+        Boards.ALL.forEach { board ->
+            val tab = Button(this).apply {
+                text = board.displayName
+                textSize = 11f
+                isAllCaps = false
+                setBackgroundColor(
+                    if (board.key == currentBoardKey) Color.parseColor("#262D35")
+                    else Color.TRANSPARENT
+                )
+                setTextColor(
+                    if (board.key == currentBoardKey) Color.parseColor("#E3A458")
+                    else Color.parseColor("#8A939C")
+                )
+                setOnClickListener { switchBoard(board) }
+            }
+            val params = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            boardTabContainer.addView(tab, params)
+        }
+    }
+
+    private fun switchBoard(board: BoardDef) {
+        if (board.key == currentBoardKey) return
+
+        currentBoardKey = board.key
+        storage.saveSelectedBoard(currentProfile.key, board.key)
+
+        // Pull in whatever was previously saved for this profile+board combo
+        // (if any), then drop any assignment that no longer resolves to a
+        // real, usable pin on the new board rather than silently keeping a
+        // stale GPIO number that may mean something completely different.
+        val loaded = storage.load(currentProfile.key, board.key, emptyMap())
+        val dropped = mutableListOf<String>()
+
+        currentProfile.roles.forEach { role ->
+            val existingGpio = assignments[role.key]
+            val carriedGpio = loaded[role.key]
+            when {
+                carriedGpio != null -> assignments[role.key] = carriedGpio
+                existingGpio != null && board.findByGpio(existingGpio)?.status.let {
+                    it == PinStatus.AVAILABLE || it == PinStatus.STRAPPING || it == PinStatus.UART
+                } -> {
+                    // Same GPIO number happens to exist and be usable on the
+                    // new board too — keep it as a convenience default.
+                }
+                else -> {
+                    if (existingGpio != null) dropped.add(role.label)
+                    assignments[role.key] = null
+                }
+            }
+        }
+
+        pendingRoleKey = null
+        log("Switched to board \"${board.displayName}\".")
+        if (dropped.isNotEmpty()) {
+            log("Cleared ${dropped.size} assignment(s) not valid on this board: ${dropped.joinToString()}")
+        }
+        buildBoardTabs()
         renderBoard()
         renderRoles()
     }
 
     private fun resetDefaults() {
+        currentBoardKey = currentProfile.boardKey
+        storage.saveSelectedBoard(currentProfile.key, currentBoardKey)
         assignments = currentProfile.defaults.mapValues { it.value as Int? }.toMutableMap()
         pendingRoleKey = null
-        log("Reset to firmware defaults.")
+        log("Reset to firmware defaults (board: ${Boards.byKey(currentBoardKey).displayName}).")
+        buildBoardTabs()
         renderBoard()
         renderRoles()
     }
 
     private fun renderBoard() {
         boardContainer.removeAllViews()
-        val board = Boards.byKey(currentProfile.boardKey)
+        val board = Boards.byKey(currentBoardKey)
         boardSectionLabel.text = "DEVICE — ${board.displayName.uppercase()}"
         boardContainer.addView(buildHeaderColumn(board.leftHeader))
         boardContainer.addView(buildHeaderColumn(board.rightHeader))
@@ -259,9 +330,9 @@ class PinMapperActivity : AppCompatActivity() {
             return
         }
 
-        storage.save(currentProfile.key, assignments)
+        storage.save(currentProfile.key, currentBoardKey, assignments)
         val payload = storage.buildPayload(currentProfile, assignments)
-        log("VALIDATION OK — saved locally.")
+        log("VALIDATION OK — saved locally for board \"${Boards.byKey(currentBoardKey).displayName}\".")
         log("Payload ready to send to device:")
         log(payload.toString())
 

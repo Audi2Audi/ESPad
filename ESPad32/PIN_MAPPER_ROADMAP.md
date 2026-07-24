@@ -22,12 +22,14 @@ is explicitly deferred — different pin scheme, no native WiFi/BLE, and
 likely a different transport story (companion module rather than talking
 to the phone directly). Revisit only if a specific project needs it.
 
-- [ ] Board picker dropdown in the Pin Mapper UI (currently board is
-      implied by the profile; `DeviceProfile.boardKey` already exists
-      as the seam for this)
+- [x] Board picker dropdown in the Pin Mapper UI (implemented as a tab
+      row, same pattern as the profile tabs) — switching boards carries
+      over assignments that are still valid (or previously saved for
+      that profile+board combo) and clears/logs any that aren't
+- [x] ESP32 DevKit V1 (38-pin) added as second `BoardDef`
 - [ ] Add more ESP32-family `BoardDef` entries, roughly in likely-usefulness
       order:
-      - [ ] ESP32 DevKit V1 (generic 30-pin/38-pin dev board — probably
+      - [x] ESP32 DevKit V1 (generic 30-pin/38-pin dev board — probably
             the single most common alternative to the D1 Mini32)
       - [ ] ESP32-S3 DevKit (newer, more GPIOs, native USB — worth it if
             a future project needs more pins than the D1 Mini32 offers)

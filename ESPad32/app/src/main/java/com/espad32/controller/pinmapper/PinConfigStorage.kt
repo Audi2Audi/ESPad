@@ -17,16 +17,19 @@ class PinConfigStorage(context: Context) {
 
     private val prefs = context.getSharedPreferences("espad_pin_config", Context.MODE_PRIVATE)
 
-    fun save(profileKey: String, assignments: Map<String, Int?>) {
+    private fun assignmentsKey(profileKey: String, boardKey: String) = "assign__${profileKey}__${boardKey}"
+    private fun boardChoiceKey(profileKey: String) = "board_choice__$profileKey"
+
+    fun save(profileKey: String, boardKey: String, assignments: Map<String, Int?>) {
         val json = JSONObject()
         assignments.forEach { (role, gpio) ->
             if (gpio != null) json.put(role, gpio)
         }
-        prefs.edit().putString(profileKey, json.toString()).apply()
+        prefs.edit().putString(assignmentsKey(profileKey, boardKey), json.toString()).apply()
     }
 
-    fun load(profileKey: String, defaults: Map<String, Int>): MutableMap<String, Int?> {
-        val raw = prefs.getString(profileKey, null)
+    fun load(profileKey: String, boardKey: String, defaults: Map<String, Int>): MutableMap<String, Int?> {
+        val raw = prefs.getString(assignmentsKey(profileKey, boardKey), null)
         val result = mutableMapOf<String, Int?>()
         defaults.keys.forEach { result[it] = defaults[it] }
 
@@ -37,6 +40,15 @@ class PinConfigStorage(context: Context) {
             }
         }
         return result
+    }
+
+    /** Remembers which board was last selected for a given profile. */
+    fun saveSelectedBoard(profileKey: String, boardKey: String) {
+        prefs.edit().putString(boardChoiceKey(profileKey), boardKey).apply()
+    }
+
+    fun loadSelectedBoard(profileKey: String, fallback: String): String {
+        return prefs.getString(boardChoiceKey(profileKey), fallback) ?: fallback
     }
 
     /**
