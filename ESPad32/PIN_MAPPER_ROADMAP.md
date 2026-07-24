@@ -17,17 +17,27 @@ from when picking the next increment.
 
 ## Near-term: board selection
 
+**Decision (confirmed):** stay ESP32-family only for now. Arduino support
+is explicitly deferred — different pin scheme, no native WiFi/BLE, and
+likely a different transport story (companion module rather than talking
+to the phone directly). Revisit only if a specific project needs it.
+
 - [ ] Board picker dropdown in the Pin Mapper UI (currently board is
       implied by the profile; `DeviceProfile.boardKey` already exists
       as the seam for this)
-- [ ] Add more `BoardDef` entries: plain ESP32 DevKit, ESP8266 NodeMCU,
-      others as needed
-- [ ] Arduino support is a bigger question than "add a BoardDef" —
-      Arduino boards have fewer pins, no native WiFi/BLE, different PWM
-      behavior, and likely a different transport (Arduino boards often
-      need a companion WiFi/BLE module, e.g. ESP-01 or HC-05, rather
-      than talking to the phone directly). Decide whether v1 stays
-      ESP32-only before committing to Arduino support.
+- [ ] Add more ESP32-family `BoardDef` entries, roughly in likely-usefulness
+      order:
+      - [ ] ESP32 DevKit V1 (generic 30-pin/38-pin dev board — probably
+            the single most common alternative to the D1 Mini32)
+      - [ ] ESP32-S3 DevKit (newer, more GPIOs, native USB — worth it if
+            a future project needs more pins than the D1 Mini32 offers)
+      - [ ] ESP32-C3 (RISC-V, fewer pins, smaller/cheaper — good fit for
+            simple single-function builds)
+      - ESP8266 (NodeMCU etc.) is a different chip family with its own
+        GPIO numbering/restrictions and no direct code reuse from the
+        ESP32 validation rules — worth a note but treat as its own
+        research item, not a quick add, if it ever comes up
+- [ ] ~~Arduino support~~ — deferred, see decision above
 
 ## Near-term: renaming & custom roles
 
@@ -72,7 +82,7 @@ ESP32/Arduino project" as a real goal:
 
 ## Open questions (not yet decided)
 
-- Does "any ESP or Arduino powered device" imply supporting arbitrary
+- Does "any ESP32 powered device" imply supporting arbitrary
   *sensors* (reading data back), or stay focused on *actuators* (motors,
   servos, lights, audio) like the current two profiles?
 - How much of the custom-device flow needs firmware code generation
