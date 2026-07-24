@@ -22,6 +22,7 @@ class PinMapperActivity : AppCompatActivity() {
     private lateinit var boardContainer: LinearLayout
     private lateinit var roleContainer: LinearLayout
     private lateinit var roleSectionLabel: TextView
+    private lateinit var boardSectionLabel: TextView
     private lateinit var logText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,6 +35,7 @@ class PinMapperActivity : AppCompatActivity() {
         boardContainer = findViewById(R.id.boardContainer)
         roleContainer = findViewById(R.id.roleContainer)
         roleSectionLabel = findViewById(R.id.roleSectionLabel)
+        boardSectionLabel = findViewById(R.id.boardSectionLabel)
         logText = findViewById(R.id.logText)
 
         findViewById<Button>(R.id.resetButton).setOnClickListener { resetDefaults() }
@@ -85,8 +87,10 @@ class PinMapperActivity : AppCompatActivity() {
 
     private fun renderBoard() {
         boardContainer.removeAllViews()
-        boardContainer.addView(buildHeaderColumn(BoardLayout.LEFT_HEADER))
-        boardContainer.addView(buildHeaderColumn(BoardLayout.RIGHT_HEADER))
+        val board = Boards.byKey(currentProfile.boardKey)
+        boardSectionLabel.text = "DEVICE — ${board.displayName.uppercase()}"
+        boardContainer.addView(buildHeaderColumn(board.leftHeader))
+        boardContainer.addView(buildHeaderColumn(board.rightHeader))
     }
 
     private fun buildHeaderColumn(pins: List<BoardPin>): LinearLayout {

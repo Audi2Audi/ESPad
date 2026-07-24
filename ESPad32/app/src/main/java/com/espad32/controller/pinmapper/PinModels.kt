@@ -1,8 +1,5 @@
 package com.espad32.controller.pinmapper
 
-// Adjust the package above to match ESPad's actual current namespace
-// (whatever you renamed it to when scrubbing audi2audi/freenove refs).
-
 /** A single assignable function on a device profile (e.g. "motor_dir_a"). */
 data class PinRoleDef(
     val key: String,
@@ -10,7 +7,7 @@ data class PinRoleDef(
     val group: String
 )
 
-/** Status of a physical GPIO pin on the WeMos D1 Mini32 header. */
+/** Status of a physical GPIO pin on a board header. */
 enum class PinStatus(val displayLabel: String) {
     AVAILABLE("Available"),
     STRAPPING("Strapping pin — usable, boot risk"),
@@ -26,63 +23,92 @@ data class BoardPin(
     val status: PinStatus?   // null for non-GPIO pads
 )
 
+/**
+ * Describes a physical board's pin layout and restrictions — separate from
+ * any particular device built on it. A board is reusable across many
+ * DeviceProfiles (a WeMos D1 Mini32 might run a train today, an RC car
+ * tomorrow, both sharing this same BoardDef).
+ *
+ * This is the seam for adding board selection later: registering a new
+ * BoardDef in `Boards` is all a new supported board needs on the app side.
+ * Each board's rules should stay in sync with its firmware-side
+ * pin_validation equivalent, since the app only enforces this as a
+ * convenience layer — firmware is the real safety net.
+ */
+data class BoardDef(
+    val key: String,
+    val displayName: String,
+    val leftHeader: List<BoardPin>,
+    val rightHeader: List<BoardPin>
+) {
+    fun allPins(): List<BoardPin> = leftHeader + rightHeader
+    fun findByGpio(gpio: Int): BoardPin? = allPins().find { it.gpio == gpio }
+}
+
 /** A device profile: train, RC car, etc. Mirrors the firmware profile concept. */
 data class DeviceProfile(
     val key: String,
     val displayName: String,
+    val boardKey: String,  // which BoardDef (in Boards.ALL) this profile targets
     val roles: List<PinRoleDef>,
     val defaults: Map<String, Int>
 )
 
-object BoardLayout {
-    // Matches pin_validation.h on the firmware side. Keep these two in sync
-    // if the validation rules ever change.
-    val LEFT_HEADER = listOf(
-        BoardPin("EN", null, null),
-        BoardPin("VP", 36, PinStatus.INPUT_ONLY),
-        BoardPin("VN", 39, PinStatus.INPUT_ONLY),
-        BoardPin("34", 34, PinStatus.INPUT_ONLY),
-        BoardPin("35", 35, PinStatus.INPUT_ONLY),
-        BoardPin("32", 32, PinStatus.AVAILABLE),
-        BoardPin("33", 33, PinStatus.AVAILABLE),
-        BoardPin("25", 25, PinStatus.AVAILABLE),
-        BoardPin("26", 26, PinStatus.AVAILABLE),
-        BoardPin("27", 27, PinStatus.AVAILABLE),
-        BoardPin("14", 14, PinStatus.AVAILABLE),
-        BoardPin("12", 12, PinStatus.STRAPPING),
-        BoardPin("GND", null, null),
-        BoardPin("13", 13, PinStatus.AVAILABLE)
+object Boards {
+    val D1_MINI32 = BoardDef(
+        key = "d1_mini32",
+        displayName = "WeMos D1 Mini32",
+        leftHeader = listOf(
+            BoardPin("EN", null, null),
+            BoardPin("VP", 36, PinStatus.INPUT_ONLY),
+            BoardPin("VN", 39, PinStatus.INPUT_ONLY),
+            BoardPin("34", 34, PinStatus.INPUT_ONLY),
+            BoardPin("35", 35, PinStatus.INPUT_ONLY),
+            BoardPin("32", 32, PinStatus.AVAILABLE),
+            BoardPin("33", 33, PinStatus.AVAILABLE),
+            BoardPin("25", 25, PinStatus.AVAILABLE),
+            BoardPin("26", 26, PinStatus.AVAILABLE),
+            BoardPin("27", 27, PinStatus.AVAILABLE),
+            BoardPin("14", 14, PinStatus.AVAILABLE),
+            BoardPin("12", 12, PinStatus.STRAPPING),
+            BoardPin("GND", null, null),
+            BoardPin("13", 13, PinStatus.AVAILABLE)
+        ),
+        rightHeader = listOf(
+            BoardPin("VIN", null, null),
+            BoardPin("GND", null, null),
+            BoardPin("23", 23, PinStatus.AVAILABLE),
+            BoardPin("22", 22, PinStatus.AVAILABLE),
+            BoardPin("TX0", 1, PinStatus.UART),
+            BoardPin("RX0", 3, PinStatus.UART),
+            BoardPin("21", 21, PinStatus.AVAILABLE),
+            BoardPin("GND", null, null),
+            BoardPin("19", 19, PinStatus.AVAILABLE),
+            BoardPin("18", 18, PinStatus.AVAILABLE),
+            BoardPin("5", 5, PinStatus.AVAILABLE),
+            BoardPin("17", 17, PinStatus.AVAILABLE),
+            BoardPin("16", 16, PinStatus.AVAILABLE),
+            BoardPin("4", 4, PinStatus.AVAILABLE),
+            BoardPin("0", 0, PinStatus.STRAPPING),
+            BoardPin("2", 2, PinStatus.STRAPPING),
+            BoardPin("15", 15, PinStatus.STRAPPING)
+        )
     )
 
-    val RIGHT_HEADER = listOf(
-        BoardPin("VIN", null, null),
-        BoardPin("GND", null, null),
-        BoardPin("23", 23, PinStatus.AVAILABLE),
-        BoardPin("22", 22, PinStatus.AVAILABLE),
-        BoardPin("TX0", 1, PinStatus.UART),
-        BoardPin("RX0", 3, PinStatus.UART),
-        BoardPin("21", 21, PinStatus.AVAILABLE),
-        BoardPin("GND", null, null),
-        BoardPin("19", 19, PinStatus.AVAILABLE),
-        BoardPin("18", 18, PinStatus.AVAILABLE),
-        BoardPin("5", 5, PinStatus.AVAILABLE),
-        BoardPin("17", 17, PinStatus.AVAILABLE),
-        BoardPin("16", 16, PinStatus.AVAILABLE),
-        BoardPin("4", 4, PinStatus.AVAILABLE),
-        BoardPin("0", 0, PinStatus.STRAPPING),
-        BoardPin("2", 2, PinStatus.STRAPPING),
-        BoardPin("15", 15, PinStatus.STRAPPING)
-    )
+    // Future boards get added here as their own BoardDef entries, e.g.:
+    // val ESP32_DEVKIT = BoardDef(key = "esp32_devkit", ...)
+    // val ARDUINO_UNO   = BoardDef(key = "arduino_uno", ...)
 
-    fun allPins(): List<BoardPin> = LEFT_HEADER + RIGHT_HEADER
+    val ALL = listOf(D1_MINI32)
 
-    fun findByGpio(gpio: Int): BoardPin? = allPins().find { it.gpio == gpio }
+    fun byKey(key: String): BoardDef = ALL.find { it.key == key } ?: D1_MINI32
 }
 
 object Profiles {
     val TRAIN = DeviceProfile(
         key = "train",
         displayName = "Train (TB6612FNG + MAX98357A)",
+        boardKey = Boards.D1_MINI32.key,
         roles = listOf(
             PinRoleDef("motor_dir_a", "Motor direction A", "Motor"),
             PinRoleDef("motor_dir_b", "Motor direction B", "Motor"),
@@ -101,6 +127,7 @@ object Profiles {
     val RC_CAR = DeviceProfile(
         key = "rc_car",
         displayName = "RC Car",
+        boardKey = Boards.D1_MINI32.key,
         roles = listOf(
             PinRoleDef("motor_a_dir1", "Motor A direction 1", "Drive"),
             PinRoleDef("motor_a_dir2", "Motor A direction 2", "Drive"),

@@ -30,6 +30,7 @@
 
         <!-- Board diagram -->
         <TextView
+            android:id="@+id/boardSectionLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="DEVICE — WEMOS D1 MINI32"
