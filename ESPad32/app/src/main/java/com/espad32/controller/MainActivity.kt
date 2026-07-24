@@ -138,9 +138,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         findViewById<android.widget.Button>(R.id.btnPhotoOverlay).setOnClickListener { takePhoto() }
         findViewById<android.widget.Button>(R.id.btnRecordOverlay).setOnClickListener { toggleRecording() }
         findViewById<android.widget.Button>(R.id.btnSettingsOverlay).setOnClickListener { showSettings() }
-        findViewById<android.widget.Button>(R.id.btnSettingsOverlay).setOnLongClickListener {
+        findViewById<android.widget.Button>(R.id.btnPinMapperOverlay).setOnClickListener {
             startActivity(Intent(this@MainActivity, com.espad32.controller.pinmapper.PinMapperActivity::class.java))
-            true
         }
 
         setupAutoHide()
