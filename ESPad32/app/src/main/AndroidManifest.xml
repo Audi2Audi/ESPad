@@ -66,5 +66,9 @@
                 android:resource="@xml/file_paths"/>
         </provider>
 
+        <activity
+            android:name=".pinmapper.PinMapperActivity"
+            android:label="Pin Mapper" />
+
     </application>
 </manifest>

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    activity_pin_mapper.xml
+
+    Drop into res/layout/. Uses simple LinearLayouts (no RecyclerView)
+    since role/pin counts are small (max ~17 pins, ~7 roles per profile) —
+    keeps this easy to read and modify without adapter boilerplate.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F1215">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Profile switcher -->
+        <LinearLayout
+            android:id="@+id/profileTabContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#181D23"
+            android:padding="4dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Board diagram -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DEVICE — WEMOS D1 MINI32"
+            android:textColor="#5F6A73"
+            android:textSize="11sp"
+            android:letterSpacing="0.1"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/boardContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#141920"
+            android:padding="12dp" />
+
+        <!-- Role list -->
+        <TextView
+            android:id="@+id/roleSectionLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FUNCTIONS"
+            android:textColor="#5F6A73"
+            android:textSize="11sp"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:id="@+id/roleContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <!-- Actions -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp">
+
+            <Button
+                android:id="@+id/resetButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Reset defaults"
+                android:backgroundTint="#181D23"
+                android:textColor="#C7CCD1"
+                android:layout_marginEnd="8dp" />
+
+            <Button
+                android:id="@+id/saveButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="2"
+                android:text="Validate &amp; Save"
+                android:backgroundTint="#E3A458"
+                android:textColor="#1A1408" />
+        </LinearLayout>
+
+        <!-- Log console -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DEVICE LOG"
+            android:textColor="#4A525A"
+            android:textSize="10sp"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:id="@+id/logText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:textSize="11sp"
+            android:textColor="#9AA4AD"
+            android:background="#0B0D10"
+            android:padding="10dp" />
+
+    </LinearLayout>
+</ScrollView>
