@@ -8,7 +8,7 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.espad32.controller"
+        applicationId "com.espad32.controller.espad"
         minSdk 26
         targetSdk 35
         versionCode 1
