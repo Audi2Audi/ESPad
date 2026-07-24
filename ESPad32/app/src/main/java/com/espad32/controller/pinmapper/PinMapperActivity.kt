@@ -100,7 +100,7 @@ class PinMapperActivity : AppCompatActivity() {
 
     private fun buildPinRow(pin: BoardPin): View {
         val assignedRole = pin.gpio?.let { gpio -> assignments.entries.find { it.value == gpio }?.key }
-        val isClickable = pendingRoleKey != null && pin.status != PinStatus.INPUT_ONLY && pin.gpio != null
+        val pinClickable = pendingRoleKey != null && pin.status != PinStatus.INPUT_ONLY && pin.gpio != null
 
         val dotColor = when {
             pin.gpio == null -> "#333A41"
@@ -119,8 +119,8 @@ class PinMapperActivity : AppCompatActivity() {
             setBackgroundColor(
                 if (assignedRole != null) Color.parseColor("#231C14") else Color.TRANSPARENT
             )
-            isClickable = isClickable
-            if (isClickable) {
+            isClickable = pinClickable
+            if (pinClickable) {
                 setOnClickListener { onPinTapped(pin) }
             }
         }
