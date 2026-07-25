@@ -119,6 +119,38 @@ to the phone directly). Revisit only if a specific project needs it.
       someone else with the same hardware, without remapping from
       scratch
 
+## Live device transport — confirmed architecture
+
+**Decision (confirmed):**
+- **Phone ↔ ESP32:** WiFi/TCP, same pattern as the original car app (which
+  used TCP port 4000). Not BLE, at least for now.
+- **Physical input:** a Bluetooth gamepad (e.g. GameSir) connects to the
+  **phone**, not the ESP32 — this is already how the existing gamepad/
+  `KeyEvent`/`MotionEvent` handling and `ButtonFunction` mapping work in
+  MainActivity. The gamepad is just a phone-side input source; it has
+  no direct relationship to the ESP32 connection at all.
+- **BLE to the ESP32** is explicitly deferred — revisit only once the
+  WiFi/TCP path is fully built, proven, and stable. Not a blocking
+  decision now, just not the default.
+
+This is a straightforward extension of what already exists, not a new
+architecture: the original car app already speaks TCP to an ESP32 and
+already reads gamepad input on the phone side. What's missing is
+extending that same TCP command channel to also carry the generic
+role-based commands from Pin Mapper/Controls (`SET <role> <value>`,
+matching what the Serial test harness already proved works on the
+firmware side — see below), rather than only the fixed car-specific
+commands.
+
+**Confirmed working (Serial-only, phone not yet involved):** flashed
+`ESPad_PinConfig_Test.ino` to a real WeMos D1 Mini32 with the motor
+shield soldered on, assigned a test role to GPIO 4 via the JSON config
+payload, and verified with a multimeter that `SET test_led 1/0` over
+Serial actually drives the pin HIGH/LOW. This confirms the firmware-side
+chain (saved role → resolved GPIO → real hardware output) works
+correctly — the prerequisite before wiring the same command up over
+TCP instead of Serial.
+
 ## Bigger lift: firmware-side generality
 
 This is the harder half, and probably the long pole for "control any
@@ -130,10 +162,9 @@ ESP32/Arduino project" as a real goal:
       generic capability system — e.g. "here's a PWM output on pin X,
       here's a digital sensor on pin Y" — resolved at runtime, rather
       than compiled-in driver logic per profile
-- [ ] Decide on a transport strategy that scales beyond the current
-      Serial test harness — likely the same WiFi/TCP or BLE the RC car
-      profile already uses, but a custom/user-defined device may need
-      its own negotiated command set rather than fixed roles
+- [ ] Extend the confirmed-working `SET <role> <value>` command (proven
+      over Serial) to run over the TCP connection instead — this is the
+      concrete next build step, not just a research question anymore
 
 ## Open questions (not yet decided)
 
