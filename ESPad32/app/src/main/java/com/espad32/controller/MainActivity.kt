@@ -630,6 +630,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         buttons.chunked(4).forEach { rowButtons ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
+                gravity = if (rowButtons.size == 1) android.view.Gravity.CENTER_HORIZONTAL else android.view.Gravity.START
                 val params = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
                 )
@@ -637,7 +638,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 layoutParams = params
             }
             rowButtons.forEachIndexed { i, btn ->
-                row.addView(buildLiveButton(profile.key, btn, isLastInRow = i == rowButtons.size - 1))
+                row.addView(buildLiveButton(profile.key, btn, isLastInRow = i == rowButtons.size - 1, soloInRow = rowButtons.size == 1))
             }
             container.addView(row)
         }
@@ -645,14 +646,23 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private fun buildLiveButton(profileKey: String, btn: ControlButtonDef, isLastInRow: Boolean): Button {
+    private fun buildLiveButton(profileKey: String, btn: ControlButtonDef, isLastInRow: Boolean, soloInRow: Boolean): Button {
         val isOn = controlButtonStorage.getState(profileKey, btn.id)
         val view = layoutInflater.inflate(R.layout.item_dynamic_car_button, null) as Button
         view.text = btn.label
         if (isOn) view.setTextColor(Color.parseColor("#E3A458"))
 
-        val params = LinearLayout.LayoutParams(0, dp(36), 1f)
-        if (!isLastInRow) params.marginEnd = dp(4)
+        val params = if (soloInRow) {
+            // A single button in its own row shouldn't stretch edge-to-edge
+            // like it's part of a 4-across grid — size to content instead,
+            // with a sensible minimum so it's still a comfortable tap target.
+            view.minWidth = dp(160)
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36))
+        } else {
+            LinearLayout.LayoutParams(0, dp(36), 1f).apply {
+                if (!isLastInRow) marginEnd = dp(4)
+            }
+        }
         view.layoutParams = params
 
         view.setOnClickListener {
