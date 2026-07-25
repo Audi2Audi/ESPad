@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var controlPanelView: ControlPanelView
     private lateinit var joystickLeft: JoystickView
     private lateinit var joystickRight: JoystickView
-    private lateinit var liveButtonsContainer: LinearLayout
     private lateinit var controlButtonStorage: ControlButtonStorage
 
     private var carIp = "192.168.4.1"
@@ -131,7 +130,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         controlPanelView = findViewById(R.id.controlPanel)
         joystickLeft     = findViewById(R.id.joystickLeft)
         joystickRight    = findViewById(R.id.joystickRight)
-        liveButtonsContainer = findViewById(R.id.liveButtonsContainer)
         controlButtonStorage = ControlButtonStorage(this)
 
         mediaSaver = MediaSaver(this)
@@ -621,49 +619,60 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // limitations). Local-only, same as the Controls screen itself —
     // tapping flips stored state and does not talk to the ESP32 yet.
     private fun renderLiveButtons() {
-        liveButtonsContainer.removeAllViews()
+        val container = controlPanelView.getDynamicButtonsContainer()
+        container.removeAllViews()
         val profileKey = ActiveProfile.get(this, Profiles.TRAIN.key)
         val profile = Profiles.ALL.find { it.key == profileKey } ?: Profiles.TRAIN
         val buttons = controlButtonStorage.loadButtons(profile.key)
 
-        buttons.forEach { btn ->
-            liveButtonsContainer.addView(buildLiveButton(profile.key, btn))
+        // Chunk into rows of up to 4, matching the density of the fixed
+        // rows above (Photo/Record/Log/Matrix/Settings is 5, LED row is 4).
+        buttons.chunked(4).forEach { rowButtons ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.topMargin = dp(6)
+                layoutParams = params
+            }
+            rowButtons.forEachIndexed { i, btn ->
+                row.addView(buildLiveButton(profile.key, btn, isLastInRow = i == rowButtons.size - 1))
+            }
+            container.addView(row)
         }
     }
 
-    private fun buildLiveButton(profileKey: String, btn: ControlButtonDef): Button {
-        val isOn = controlButtonStorage.getState(profileKey, btn.id)
-        return Button(this).apply {
-            text = btn.label
-            textSize = 12f
-            isAllCaps = false
-            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.btn_car_bg)
-            setTextColor(Color.parseColor(if (isOn) "#E3A458" else "#CCCCCC"))
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            params.bottomMargin = 12
-            layoutParams = params
-            setPadding(24, 16, 24, 16)
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-            setOnClickListener {
-                when (btn.controlType) {
-                    ControlType.TOGGLE -> {
-                        val newState = !controlButtonStorage.getState(profileKey, btn.id)
-                        controlButtonStorage.setState(profileKey, btn.id, newState)
-                        CarLogger.log("Controls", "\"${btn.label}\" -> ${if (newState) "ON" else "OFF"} (local only, not yet sent to device)")
-                    }
-                    ControlType.MOMENTARY -> {
-                        CarLogger.log("Controls", "\"${btn.label}\" pressed (local only, not yet sent to device)")
-                    }
+    private fun buildLiveButton(profileKey: String, btn: ControlButtonDef, isLastInRow: Boolean): Button {
+        val isOn = controlButtonStorage.getState(profileKey, btn.id)
+        val view = layoutInflater.inflate(R.layout.item_dynamic_car_button, null) as Button
+        view.text = btn.label
+        if (isOn) view.setTextColor(Color.parseColor("#E3A458"))
+
+        val params = LinearLayout.LayoutParams(0, dp(36), 1f)
+        if (!isLastInRow) params.marginEnd = dp(4)
+        view.layoutParams = params
+
+        view.setOnClickListener {
+            when (btn.controlType) {
+                ControlType.TOGGLE -> {
+                    val newState = !controlButtonStorage.getState(profileKey, btn.id)
+                    controlButtonStorage.setState(profileKey, btn.id, newState)
+                    CarLogger.log("Controls", "\"${btn.label}\" -> ${if (newState) "ON" else "OFF"} (local only, not yet sent to device)")
                 }
-                renderLiveButtons()
+                ControlType.MOMENTARY -> {
+                    CarLogger.log("Controls", "\"${btn.label}\" pressed (local only, not yet sent to device)")
+                }
             }
-            setOnLongClickListener {
-                showLiveEditDialog(profileKey, btn)
-                true
-            }
+            renderLiveButtons()
         }
+        view.setOnLongClickListener {
+            showLiveEditDialog(profileKey, btn)
+            true
+        }
+        return view
     }
 
     private fun showLiveEditDialog(profileKey: String, btn: ControlButtonDef) {

@@ -172,19 +172,6 @@
             android:background="@drawable/btn_car_bg"/>
     </LinearLayout>
 
-    <!-- Live Control buttons (from Controls screen) — middle-left, clear of
-         both joysticks (bottom) and the camera/settings overlay (bottom-right) -->
-    <LinearLayout
-        android:id="@+id/liveButtonsContainer"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginStart="16dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/statusBar"
-        app:layout_constraintBottom_toTopOf="@id/joystickLeft"
-        app:layout_constraintVertical_bias="0.5"/>
-
     <!-- Control panel — bottom, auto-hides -->
     <com.espad32.controller.ControlPanelView
         android:id="@+id/controlPanel"

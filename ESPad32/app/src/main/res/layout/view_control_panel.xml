@@ -70,4 +70,10 @@
             android:text="⚙" android:textSize="14sp" style="@style/CarButton"/>
     </LinearLayout>
 
+    <!-- Rows of user-configured Control buttons (from the Controls screen)
+         get added here at runtime by MainActivity — empty by default. -->
+    <LinearLayout android:id="@+id/dynamicButtonsContainer"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical"/>
+
 </LinearLayout>

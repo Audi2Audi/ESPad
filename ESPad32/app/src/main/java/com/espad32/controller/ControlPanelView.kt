@@ -48,4 +48,9 @@ class ControlPanelView @JvmOverloads constructor(
     }
 
     fun setButtonListener(l: ButtonListener) { listener = l }
+
+    /** Container for user-configured Control buttons, populated by
+     *  MainActivity — kept dumb here on purpose, same as the rest of
+     *  this view. */
+    fun getDynamicButtonsContainer(): LinearLayout = findViewById(R.id.dynamicButtonsContainer)
 }

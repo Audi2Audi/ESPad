@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    item_dynamic_car_button.xml
+
+    Inflated once per Control button configured in the Controls screen.
+    Uses the same @style/CarButton as every fixed button in
+    view_control_panel.xml, so user-added buttons are visually
+    indistinguishable from LED/Horn/Reset/etc.
+-->
+<Button xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="0dp"
+    android:layout_height="36dp"
+    android:layout_weight="1"
+    android:textSize="11sp"
+    style="@style/CarButton"/>

@@ -27,11 +27,13 @@ from when picking the next increment.
       ESP32 yet. Wiring this to a live GPIO toggle depends on the same
       transport work tracked under "Bigger lift: firmware-side
       generality" below.
-- [x] **Live buttons on the main driving screen** — buttons configured
-      in the Controls screen now also render directly on MainActivity
-      (middle-left, clear of joysticks and the camera overlay). Tap to
-      toggle, long-press to rename/remove right there — same underlying
-      storage as the Controls screen, so either screen stays in sync.
+- [x] **Live buttons in the existing control panel drawer** — buttons
+      configured in the Controls screen now render as extra rows inside
+      the same bottom drawer as LED/Horn/Reset/etc (`ControlPanelView` /
+      `view_control_panel.xml`), using the identical `@style/CarButton`
+      pill styling — not a separate floating widget. Tap to toggle,
+      long-press to rename/remove right there — same underlying storage
+      as the Controls screen, so either screen stays in sync.
       Required introducing `ActiveProfile` (`controls/ActiveProfile.kt`)
       since MainActivity previously had no concept of "which profile am
       I controlling" at all. **Known limitation:** this is last-selected-
