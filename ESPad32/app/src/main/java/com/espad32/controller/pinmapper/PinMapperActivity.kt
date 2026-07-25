@@ -72,6 +72,7 @@ class PinMapperActivity : AppCompatActivity() {
 
     private fun loadProfile(profile: DeviceProfile) {
         currentProfile = profile
+        com.espad32.controller.controls.ActiveProfile.set(this, profile.key)
         currentBoardKey = storage.loadSelectedBoard(profile.key, profile.boardKey)
         assignments = storage.load(profile.key, currentBoardKey, profile.defaults)
         pendingRoleKey = null

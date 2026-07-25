@@ -1,8 +1,10 @@
 package com.espad32.controller
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -11,11 +13,19 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.espad32.controller.controls.ActiveProfile
+import com.espad32.controller.controls.ControlButtonDef
+import com.espad32.controller.controls.ControlButtonStorage
+import com.espad32.controller.controls.ControlType
+import com.espad32.controller.pinmapper.Profiles
 import kotlinx.coroutines.*
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -29,6 +39,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var controlPanelView: ControlPanelView
     private lateinit var joystickLeft: JoystickView
     private lateinit var joystickRight: JoystickView
+    private lateinit var liveButtonsContainer: LinearLayout
+    private lateinit var controlButtonStorage: ControlButtonStorage
 
     private var carIp = "192.168.4.1"
     private var tcpClient: TcpClient? = null
@@ -119,6 +131,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         controlPanelView = findViewById(R.id.controlPanel)
         joystickLeft     = findViewById(R.id.joystickLeft)
         joystickRight    = findViewById(R.id.joystickRight)
+        liveButtonsContainer = findViewById(R.id.liveButtonsContainer)
+        controlButtonStorage = ControlButtonStorage(this)
 
         mediaSaver = MediaSaver(this)
         ThemeManager.load(this)
@@ -130,6 +144,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         surfaceView.holder.addCallback(this)
         setupJoysticks()
         applyJoystickVisibility()
+        renderLiveButtons()
 
         // Overlay buttons — no menu show
         val cameraControls = findViewById<android.view.ViewGroup>(R.id.cameraControls)
@@ -600,6 +615,88 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }.show(supportFragmentManager, "settings")
     }
 
+    // ── Live Control buttons (from Controls screen) ────────────────────
+    // Renders whatever buttons were configured for the currently "active"
+    // profile (see ActiveProfile.kt for what that means and its
+    // limitations). Local-only, same as the Controls screen itself —
+    // tapping flips stored state and does not talk to the ESP32 yet.
+    private fun renderLiveButtons() {
+        liveButtonsContainer.removeAllViews()
+        val profileKey = ActiveProfile.get(this, Profiles.TRAIN.key)
+        val profile = Profiles.ALL.find { it.key == profileKey } ?: Profiles.TRAIN
+        val buttons = controlButtonStorage.loadButtons(profile.key)
+
+        buttons.forEach { btn ->
+            liveButtonsContainer.addView(buildLiveButton(profile.key, btn))
+        }
+    }
+
+    private fun buildLiveButton(profileKey: String, btn: ControlButtonDef): Button {
+        val isOn = controlButtonStorage.getState(profileKey, btn.id)
+        return Button(this).apply {
+            text = btn.label
+            textSize = 12f
+            isAllCaps = false
+            background = ContextCompat.getDrawable(this@MainActivity, R.drawable.btn_car_bg)
+            setTextColor(Color.parseColor(if (isOn) "#E3A458" else "#CCCCCC"))
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.bottomMargin = 12
+            layoutParams = params
+            setPadding(24, 16, 24, 16)
+
+            setOnClickListener {
+                when (btn.controlType) {
+                    ControlType.TOGGLE -> {
+                        val newState = !controlButtonStorage.getState(profileKey, btn.id)
+                        controlButtonStorage.setState(profileKey, btn.id, newState)
+                        CarLogger.log("Controls", "\"${btn.label}\" -> ${if (newState) "ON" else "OFF"} (local only, not yet sent to device)")
+                    }
+                    ControlType.MOMENTARY -> {
+                        CarLogger.log("Controls", "\"${btn.label}\" pressed (local only, not yet sent to device)")
+                    }
+                }
+                renderLiveButtons()
+            }
+            setOnLongClickListener {
+                showLiveEditDialog(profileKey, btn)
+                true
+            }
+        }
+    }
+
+    private fun showLiveEditDialog(profileKey: String, btn: ControlButtonDef) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 0)
+        }
+        val labelInput = EditText(this).apply { setText(btn.label) }
+        container.addView(labelInput)
+
+        AlertDialog.Builder(this)
+            .setTitle("Edit Button")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                val newLabel = labelInput.text.toString().ifBlank { btn.label }
+                val buttons = controlButtonStorage.loadButtons(profileKey)
+                val index = buttons.indexOfFirst { it.id == btn.id }
+                if (index >= 0) {
+                    buttons[index] = btn.copy(label = newLabel)
+                    controlButtonStorage.saveButtons(profileKey, buttons)
+                    renderLiveButtons()
+                }
+            }
+            .setNeutralButton("Remove") { _, _ ->
+                val buttons = controlButtonStorage.loadButtons(profileKey)
+                buttons.removeAll { it.id == btn.id }
+                controlButtonStorage.saveButtons(profileKey, buttons)
+                renderLiveButtons()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     // ── Permissions ───────────────────────────────────────────────────
     private fun requestPermissions() {
         val perms = mutableListOf<String>()
@@ -628,6 +725,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
     override fun surfaceDestroyed(holder: SurfaceHolder) { cameraStream?.stop() }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh in case buttons were added/edited/removed in the
+        // Pin Mapper or Controls screen while we were away.
+        renderLiveButtons()
+    }
 
     override fun onDestroy() {
         super.onDestroy()

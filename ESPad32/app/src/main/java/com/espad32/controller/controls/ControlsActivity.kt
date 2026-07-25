@@ -70,6 +70,7 @@ class ControlsActivity : AppCompatActivity() {
 
     private fun loadProfile(profile: DeviceProfile) {
         currentProfile = profile
+        ActiveProfile.set(this, profile.key)
         buttons = buttonStorage.loadButtons(profile.key)
         log("Loaded buttons for \"${profile.displayName}\".")
         buildProfileTabs()

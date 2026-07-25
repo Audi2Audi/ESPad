@@ -27,6 +27,18 @@ from when picking the next increment.
       ESP32 yet. Wiring this to a live GPIO toggle depends on the same
       transport work tracked under "Bigger lift: firmware-side
       generality" below.
+- [x] **Live buttons on the main driving screen** — buttons configured
+      in the Controls screen now also render directly on MainActivity
+      (middle-left, clear of joysticks and the camera overlay). Tap to
+      toggle, long-press to rename/remove right there — same underlying
+      storage as the Controls screen, so either screen stays in sync.
+      Required introducing `ActiveProfile` (`controls/ActiveProfile.kt`)
+      since MainActivity previously had no concept of "which profile am
+      I controlling" at all. **Known limitation:** this is last-selected-
+      wins (whichever profile you opened last in Pin Mapper/Controls) —
+      there's no way yet for the app to know which profile the actually-
+      connected ESP32 is running, since that requires the device to tell
+      it (part of the live device sync work below).
 
 ## Near-term: board selection
 
