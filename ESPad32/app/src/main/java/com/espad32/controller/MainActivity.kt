@@ -167,18 +167,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         connectToCar()
 
         controlPanelView.setButtonListener(object : ControlPanelView.ButtonListener {
-            override fun onBuzzerChanged(on: Boolean)   { showUiTemporarily(); enqueue("CMD_BUZZER#${if (on) 1 else 0}#2000\n") }
-            override fun onLedCycle()                   { showUiTemporarily(); currentLedMode = (currentLedMode+1)%6; enqueue("CMD_LED_MOD#$currentLedMode\n") }
-            override fun onEmotionCycle()               { showUiTemporarily(); currentEmotionMode = (currentEmotionMode+1)%8; enqueue("CMD_MATRIX_MOD#$currentEmotionMode\n") }
-            override fun onEmotionOff()                 { showUiTemporarily(); currentEmotionMode = 0; enqueue("CMD_MATRIX_MOD#0\n") }
-            override fun onLedOff()                     { showUiTemporarily(); currentLedMode = 0; enqueue("CMD_LED_MOD#0\n") }
-            override fun onServoReset()                 { showUiTemporarily(); servo1Angle = 90f; servo2Angle = 90f; enqueue("CMD_CAMERA#90#90\n") }
             override fun onCameraFlip()                 { showUiTemporarily(); cameraStream?.let { it.flipped = !it.flipped } }
             override fun onTakePhoto()                  { showUiTemporarily(); takePhoto() }
             override fun onToggleRecording()            { showUiTemporarily(); toggleRecording() }
             override fun onViewLog()                    { showUiTemporarily(); startActivity(Intent(this@MainActivity, LogViewerActivity::class.java)) }
             override fun onSettings()                   { showUiTemporarily(); showSettings() }
-            override fun onMatrixCanvas()               { showUiTemporarily(); startActivity(Intent(this@MainActivity, MatrixCanvasActivity::class.java)) }
         })
 
         startMotorLoop()

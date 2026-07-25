@@ -8,45 +8,14 @@
     android:padding="8dp"
     android:paddingEnd="52dp">
 
-    <!-- Row 1: Drive modes -->
-    <!-- Row 1: LEDs + Emotion -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:layout_marginBottom="6dp">
-        <Button android:id="@+id/btnLedCycle" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="🌈 LED" android:textSize="11sp"
-            android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnLedOff" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="⬛ LED Off" android:textSize="11sp"
-            android:layout_marginEnd="8dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnEmotionCycle" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="😊 Face" android:textSize="11sp"
-            android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnEmotionOff" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="⬛ Face Off" android:textSize="11sp" style="@style/CarButton"/>
-    </LinearLayout>
-
-    <!-- Row 3: Horn + Servo + Camera flip -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:layout_marginBottom="6dp">
-        <ToggleButton android:id="@+id/btnBuzzer" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:textOn="📯 ON" android:textOff="📯 Horn"
-            android:textSize="11sp" android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnServoReset" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="🎯 Reset" android:textSize="11sp"
-            android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnCameraFlip" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="🔄 Flip" android:textSize="11sp" style="@style/CarButton"/>
-    </LinearLayout>
-
-    <!-- Row 4: Photo + Record + Log + Matrix + Settings
-         (Settings moved to rightmost = right thumb, Matrix one left) -->
+    <!-- Photo + Record + Log + Flip + Settings.
+         LED/Face/Horn/Servo Reset/Custom Face removed — those sent
+         CMD_LED_MOD / CMD_MATRIX_MOD / CMD_BUZZER / CMD_CAMERA commands
+         specific to the original Freenove-based car firmware, which
+         lives in a separate, untouched repo (ESPad32) and doesn't apply
+         to devices built for this project (train, custom RC car, etc).
+         Camera Flip is kept since it only flips the local video feed
+         orientation — no device command involved. -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal">
         <Button android:id="@+id/btnPhoto" android:layout_width="0dp"
@@ -61,9 +30,9 @@
             android:layout_height="36dp" android:layout_weight="1"
             android:text="📋" android:textSize="14sp"
             android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnMatrixCanvas" android:layout_width="0dp"
+        <Button android:id="@+id/btnCameraFlip" android:layout_width="0dp"
             android:layout_height="36dp" android:layout_weight="1"
-            android:text="🤓 CUSTOM FACE" android:textSize="10sp"
+            android:text="🔄 Flip" android:textSize="11sp"
             android:layout_marginEnd="4dp" style="@style/CarButton"/>
         <Button android:id="@+id/btnSettings" android:layout_width="0dp"
             android:layout_height="36dp" android:layout_weight="1"

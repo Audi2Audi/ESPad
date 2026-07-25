@@ -7,6 +7,17 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] Removed Freenove-firmware-specific panel buttons (LED, LED Off,
+      Face, Face Off, Horn, Servo Reset, Custom Face/Matrix Canvas) —
+      these sent `CMD_LED_MOD`/`CMD_MATRIX_MOD`/`CMD_BUZZER`/`CMD_CAMERA`
+      commands specific to the original Freenove car firmware, which
+      lives in the separate, untouched ESPad32 repo and doesn't apply
+      to devices built for this project. Kept: Camera Flip (local video
+      flip, no device command), Photo/Record/View Log/Settings (generic
+      app features). Note: `currentLedMode`/`currentEmotionMode` and the
+      gamepad `ButtonFunction` mapping that also triggers these same
+      CMD_* commands were left untouched — that's a separate system
+      from the on-screen panel and out of scope for this cleanup.
 - [x] Pin-mapping UI (tap-a-role, tap-a-pin) for Train + RC Car profiles
 - [x] App-side GPIO validation mirroring firmware's `pin_validation.h`
 - [x] Local persistence + JSON payload builder (not yet sent to device)
