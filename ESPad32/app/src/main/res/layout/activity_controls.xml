@@ -45,7 +45,7 @@
             android:id="@+id/emptyStateText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="No buttons yet. Tap \"Add Button\" below — only pins mapped as a digital output (like an LED) can back a button right now."
+            android:text="No buttons yet. Tap &quot;Add Button&quot; below — only pins mapped as a digital output (like an LED) can back a button right now."
             android:textColor="#5F6A73"
             android:textSize="12sp"
             android:padding="16dp"
