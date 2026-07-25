@@ -141,6 +141,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         findViewById<android.widget.Button>(R.id.btnPinMapperOverlay).setOnClickListener {
             startActivity(Intent(this@MainActivity, com.espad32.controller.pinmapper.PinMapperActivity::class.java))
         }
+        findViewById<android.widget.Button>(R.id.btnControlsOverlay).setOnClickListener {
+            startActivity(Intent(this@MainActivity, com.espad32.controller.controls.ControlsActivity::class.java))
+        }
 
         setupAutoHide()
 

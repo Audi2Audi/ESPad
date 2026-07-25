@@ -164,6 +164,11 @@
         <Button android:id="@+id/btnPinMapperOverlay"
             android:layout_width="52dp" android:layout_height="52dp"
             android:text="📌" android:textSize="22sp"
+            android:background="@drawable/btn_car_bg"
+            android:layout_marginBottom="8dp"/>
+        <Button android:id="@+id/btnControlsOverlay"
+            android:layout_width="52dp" android:layout_height="52dp"
+            android:text="🔘" android:textSize="22sp"
             android:background="@drawable/btn_car_bg"/>
     </LinearLayout>
 

@@ -1,10 +1,26 @@
 package com.espad32.controller.pinmapper
 
+/**
+ * What kind of signal a role represents. Determines what UI makes sense
+ * for it: a DIGITAL_OUTPUT can back a simple on/off button; PWM_OUTPUT
+ * and SERVO need a continuous control (slider) rather than a toggle —
+ * not built yet, tracked in the roadmap. AUDIO_SIGNAL and DIGITAL_INPUT
+ * exist so those roles are correctly excluded from "add a button" flows.
+ */
+enum class RoleType {
+    DIGITAL_OUTPUT,
+    PWM_OUTPUT,
+    SERVO,
+    DIGITAL_INPUT,
+    AUDIO_SIGNAL
+}
+
 /** A single assignable function on a device profile (e.g. "motor_dir_a"). */
 data class PinRoleDef(
     val key: String,
     val label: String,
-    val group: String
+    val group: String,
+    val type: RoleType = RoleType.DIGITAL_OUTPUT
 )
 
 /** Status of a physical GPIO pin on a board header. */
@@ -163,13 +179,13 @@ object Profiles {
         displayName = "Train (TB6612FNG + MAX98357A)",
         boardKey = Boards.D1_MINI32.key,
         roles = listOf(
-            PinRoleDef("motor_dir_a", "Motor direction A", "Motor"),
-            PinRoleDef("motor_dir_b", "Motor direction B", "Motor"),
-            PinRoleDef("motor_pwm", "Motor speed (PWM)", "Motor"),
-            PinRoleDef("motor_standby", "Motor standby", "Motor"),
-            PinRoleDef("audio_bclk", "Audio bit clock", "Audio"),
-            PinRoleDef("audio_lrc", "Audio L/R clock", "Audio"),
-            PinRoleDef("audio_din", "Audio data in", "Audio")
+            PinRoleDef("motor_dir_a", "Motor direction A", "Motor", RoleType.DIGITAL_OUTPUT),
+            PinRoleDef("motor_dir_b", "Motor direction B", "Motor", RoleType.DIGITAL_OUTPUT),
+            PinRoleDef("motor_pwm", "Motor speed (PWM)", "Motor", RoleType.PWM_OUTPUT),
+            PinRoleDef("motor_standby", "Motor standby", "Motor", RoleType.DIGITAL_OUTPUT),
+            PinRoleDef("audio_bclk", "Audio bit clock", "Audio", RoleType.AUDIO_SIGNAL),
+            PinRoleDef("audio_lrc", "Audio L/R clock", "Audio", RoleType.AUDIO_SIGNAL),
+            PinRoleDef("audio_din", "Audio data in", "Audio", RoleType.AUDIO_SIGNAL)
         ),
         defaults = mapOf(
             "motor_dir_a" to 26, "motor_dir_b" to 27, "motor_pwm" to 14,
@@ -182,11 +198,11 @@ object Profiles {
         displayName = "RC Car",
         boardKey = Boards.D1_MINI32.key,
         roles = listOf(
-            PinRoleDef("motor_a_dir1", "Motor A direction 1", "Drive"),
-            PinRoleDef("motor_a_dir2", "Motor A direction 2", "Drive"),
-            PinRoleDef("motor_a_pwm", "Motor A speed (PWM)", "Drive"),
-            PinRoleDef("steering_servo", "Steering servo", "Steering"),
-            PinRoleDef("headlight", "Headlights", "Lights")
+            PinRoleDef("motor_a_dir1", "Motor A direction 1", "Drive", RoleType.DIGITAL_OUTPUT),
+            PinRoleDef("motor_a_dir2", "Motor A direction 2", "Drive", RoleType.DIGITAL_OUTPUT),
+            PinRoleDef("motor_a_pwm", "Motor A speed (PWM)", "Drive", RoleType.PWM_OUTPUT),
+            PinRoleDef("steering_servo", "Steering servo", "Steering", RoleType.SERVO),
+            PinRoleDef("headlight", "Headlights", "Lights", RoleType.DIGITAL_OUTPUT)
         ),
         defaults = mapOf(
             "motor_a_dir1" to 16, "motor_a_dir2" to 17, "motor_a_pwm" to 4,

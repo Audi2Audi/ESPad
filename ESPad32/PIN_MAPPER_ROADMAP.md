@@ -14,6 +14,19 @@ from when picking the next increment.
       device profiles, so a board can be reused across multiple devices
       and new boards can be added without touching profile code
       (see `pinmapper/PinModels.kt` — `Boards` object)
+- [x] `RoleType` added to `PinRoleDef` (DIGITAL_OUTPUT, PWM_OUTPUT,
+      SERVO, DIGITAL_INPUT, AUDIO_SIGNAL) — prerequisite for both custom
+      roles and on-screen Controls below
+- [x] **Controls screen** (`controls/` package): add/rename/remove
+      on-screen buttons bound to a pin-mapped role. Only DIGITAL_OUTPUT
+      roles are offered (e.g. an LED/headlight) — PWM/servo need a
+      slider control that doesn't exist yet. Buttons support TOGGLE
+      (stays on/off) or MOMENTARY (on while pressed).
+      **Local-only right now** — tapping a button flips locally stored
+      state and logs what command *would* be sent; nothing reaches the
+      ESP32 yet. Wiring this to a live GPIO toggle depends on the same
+      transport work tracked under "Bigger lift: firmware-side
+      generality" below.
 
 ## Near-term: board selection
 
@@ -46,11 +59,26 @@ to the phone directly). Revisit only if a specific project needs it.
 - [ ] Relabel an existing role (e.g. "Motor direction A" → "Left wheel
       forward") — straightforward, just an editable text field per role
 - [ ] Add a brand-new role the app doesn't know about yet (e.g. "Fog
-      machine trigger") — needs each role to declare a **type**
-      (digital-out, PWM, servo, I2C, analog-in, sensor-input) so pin
-      validation can filter correctly per role automatically, instead
-      of the current approach where "requires output" is hardcoded
-      per-call in `PinValidation.canAssign`
+      machine trigger") — `RoleType` now exists (done above), so this is
+      mostly UI work: a "new role" flow that lets someone pick a type
+      and have `PinValidation` filter correctly automatically
+
+## Near-term: Controls screen follow-ups
+
+- [ ] **Live device sync** — the big one. Buttons currently only flip
+      local state and log what they'd send. Needs the same transport
+      (WiFi/TCP or BLE) already tracked below, plus a firmware command
+      handler that actually does `digitalWrite` on TOGGLE/MOMENTARY
+- [ ] Slider control for PWM_OUTPUT and SERVO roles (motor speed,
+      steering angle) — buttons only make sense for DIGITAL_OUTPUT;
+      continuous values need a different UI element entirely
+- [ ] Momentary buttons currently log on tap only — for a real "on
+      while held" feel this needs press/release touch handling
+      (`OnTouchListener`, not `OnClickListener`), which matters more
+      once live device sync exists (a real horn should stop honking on
+      release, not stay on until tapped again)
+- [ ] Reordering buttons (drag-and-drop) once someone has more than a
+      handful — not needed yet with only 1-2 buttons per profile
 
 ## Medium-term: user-defined devices
 
