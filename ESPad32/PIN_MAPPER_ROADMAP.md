@@ -429,6 +429,24 @@ ESP32/Arduino project" as a real goal:
       over Serial) to run over the TCP connection instead — this is the
       concrete next build step, not just a research question anymore
 
+## Known issue to investigate
+
+- **Suspected ESP32 crash/reboot during gamepad axis PWM testing** — app
+  showed "Reconnecting..." after driving the axis-mapped PWM slider for
+  a bit. Not root-caused yet, deferred for a dedicated session. Worth
+  checking when picked back up:
+  - Whether it's actually a crash (full reboot — check Serial Monitor
+    for a boot banner reappearing) vs. just the same stale-TCP-client
+    issue from earlier (v4's fix), vs. an unrelated WiFi hiccup.
+  - Whether the axis rate limit (80ms / ~12.5 sends/sec) is actually
+    being respected, or whether rapid repeated `ledcWrite()` calls
+    combined with TCP/WiFi traffic in the same `loop()` iteration could
+    be tripping the ESP32's task watchdog.
+  - Whether this only happens during axis-driven PWM (continuous rapid
+    changes) or also with the Controls slider's single on-release send
+    (which would point to something in the PWM/LEDC path itself rather
+    than to rate/frequency of commands).
+
 ## Open questions (not yet decided)
 
 - Does "any ESP32 powered device" imply supporting arbitrary
