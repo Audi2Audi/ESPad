@@ -7,6 +7,23 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] **Fixed:** Controls' "Add Button" role picker was an unbounded
+      horizontal row of buttons with no scrolling or wrapping — once
+      there were more than ~3-4 eligible roles, longer labels (e.g.
+      "Motor speed (PWM)") pushed later roles off the visible dialog
+      width, making them appear to not exist even though the data was
+      fine. Replaced with a vertical, scrollable, single-select list —
+      no limit on how many roles can be offered. Also dropped the
+      redundant auto-appended " (PWM)" suffix (built-in role labels can
+      already contain "(PWM)" themselves, producing "(PWM) (PWM)") in
+      favor of a small separate type tag next to each role name.
+- [x] **Fixed:** deleting a custom function in Pin Mapper was only
+      reachable via a hidden long-press with no visible hint it
+      existed. Added a visible 🗑 icon on custom role rows (built-in
+      roles still can't be deleted, only renamed, since other logic
+      depends on their key existing) — tapping it opens the same
+      rename/delete dialog long-press already did.
+
 - [x] **UDP broadcast device discovery** — solves "the STA IP wasn't
       reported in time during the AP->STA channel switch" (the ESP32
       has one radio, so AP+STA share a channel; when STA connects to a

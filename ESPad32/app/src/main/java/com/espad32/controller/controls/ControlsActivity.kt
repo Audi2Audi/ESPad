@@ -256,10 +256,12 @@ class ControlsActivity : AppCompatActivity() {
             return
         }
 
+        val outerScroll = android.widget.ScrollView(this)
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(40, 24, 40, 0)
         }
+        outerScroll.addView(container)
 
         val labelInput = EditText(this).apply {
             hint = "Button label (e.g. Headlight)"
@@ -303,28 +305,69 @@ class ControlsActivity : AppCompatActivity() {
             }
         }
 
-        val roleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        eligible.forEach { role ->
-            val roleBtn = Button(this).apply {
-                text = role.label + if (role.type == RoleType.PWM_OUTPUT) " (PWM)" else ""
-                textSize = 11f
-                isAllCaps = false
-                setOnClickListener {
-                    selectedRole = role
-                    if (labelInput.text.isBlank()) labelInput.setText(role.label)
-                    rebuildBehaviorSection()
-                }
+        // Vertical, scrollable, single-select list — a horizontal row of
+        // buttons silently ran out of screen width once there were more
+        // than 3-4 roles, making some genuinely unreachable rather than
+        // actually missing. This has no such limit.
+        val roleListContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val roleRowViews = mutableMapOf<String, LinearLayout>()
+
+        fun refreshRoleSelectionHighlight() {
+            roleRowViews.forEach { (key, rowView) ->
+                val isSelected = key == selectedRole.key
+                rowView.setBackgroundColor(
+                    Color.parseColor(if (isSelected) "#262D35" else "#181D23")
+                )
             }
-            roleRow.addView(roleBtn)
         }
-        container.addView(roleRow)
+
+        eligible.forEach { role ->
+            val typeTag = when (role.type) {
+                RoleType.PWM_OUTPUT -> "PWM"
+                else -> "On/Off"
+            }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(20, 16, 20, 16)
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.bottomMargin = 4
+                layoutParams = params
+            }
+            row.addView(TextView(this).apply {
+                text = role.label
+                setTextColor(Color.parseColor("#E7EBEE"))
+                textSize = 13f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            row.addView(TextView(this).apply {
+                text = typeTag
+                setTextColor(Color.parseColor("#5F6A73"))
+                textSize = 11f
+            })
+            row.setOnClickListener {
+                selectedRole = role
+                if (labelInput.text.isBlank() || eligible.any { it.label == labelInput.text.toString() }) {
+                    labelInput.setText(role.label)
+                }
+                rebuildBehaviorSection()
+                refreshRoleSelectionHighlight()
+            }
+            roleRowViews[role.key] = row
+            roleListContainer.addView(row)
+        }
+        refreshRoleSelectionHighlight()
+
+        container.addView(roleListContainer)
         container.addView(behaviorLabel)
         container.addView(behaviorContainer)
         rebuildBehaviorSection() // reflect the default-selected role immediately
 
         AlertDialog.Builder(this)
             .setTitle("Add Button")
-            .setView(container)
+            .setView(outerScroll)
             .setPositiveButton("Add") { _, _ ->
                 val label = labelInput.text.toString().ifBlank { selectedRole.label }
                 val newButton = ControlButtonDef(

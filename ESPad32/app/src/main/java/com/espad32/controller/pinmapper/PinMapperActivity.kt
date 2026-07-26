@@ -354,6 +354,25 @@ class PinMapperActivity : AppCompatActivity() {
 
         row.addView(nameView)
         row.addView(valueView)
+
+        // Custom roles get a visible delete icon — relying on a hidden
+        // long-press alone made deletion undiscoverable. Built-in roles
+        // stay long-press-to-rename only (they can't be deleted).
+        val isCustom = customRoles.any { it.key == role.key }
+        if (isCustom) {
+            val deleteBtn = TextView(this).apply {
+                text = "🗑"
+                textSize = 14f
+                setPadding(24, 0, 0, 0)
+                setOnClickListener {
+                    // Don't let this bubble up to the row's own click
+                    // listener (which toggles pin-assignment mode).
+                    showEditRoleDialog(role)
+                }
+            }
+            row.addView(deleteBtn)
+        }
+
         row.setOnLongClickListener {
             showEditRoleDialog(role)
             true
