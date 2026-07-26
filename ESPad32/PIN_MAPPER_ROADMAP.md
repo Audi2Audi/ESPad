@@ -248,6 +248,28 @@ your device, then connect to it."
       so behavior (and the device log) is identical either way.
       **Axes/sticks still not done** — this covers buttons only, per
       the split noted above.
+- [x] **PWM functions wired end-to-end in the app** — Pin Mapper's
+      "Add Function" now has a real type picker (On/Off vs. PWM 0-255),
+      not hardcoded to digital-only. Controls' "Add Button" adapts its
+      behavior options based on the selected role's type: DIGITAL_OUTPUT
+      still offers Toggle/Momentary, PWM_OUTPUT is always a slider (no
+      choice to make, since that's the only sensible control for a
+      continuous value). The Controls screen renders PWM roles as an
+      actual `SeekBar` (0-255) instead of a toggle, sending
+      `DeviceCommand.sendSetValue()` (`SETV <role> <value>`) only on
+      `onStopTrackingTouch` — not on every drag tick, since that would
+      flood the single-client TCP connection with dozens of commands a
+      second for one gesture.
+      **Scoped out for now:** PWM sliders don't render on the main
+      driving screen's compact pill-button panel (no slider widget
+      there) — they're fully usable from the Controls screen only.
+      **Also noted:** a gamepad button mapped to a PWM/slider function
+      logs a clear "can't drive it yet" message instead of doing
+      something wrong — driving a continuous value needs axis mapping
+      (a stick), not a button, and that's still unbuilt.
+      SERVO roles still aren't offered anywhere — firmware has no angle
+      command yet (`SETV` is PWM duty only, confirmed via multimeter
+      testing on the D1 Mini32 test rig).
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI

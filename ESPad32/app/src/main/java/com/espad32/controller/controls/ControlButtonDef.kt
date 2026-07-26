@@ -4,25 +4,26 @@ package com.espad32.controller.controls
  * How a button behaves when tapped.
  * TOGGLE: stays on until tapped again (e.g. headlight on/off).
  * MOMENTARY: on only while held/tapped, then reverts (e.g. horn).
+ * SLIDER: continuous 0-255 value (e.g. motor speed) — backs a
+ * PWM_OUTPUT role, sends SETV instead of SET.
  */
 enum class ControlType {
     TOGGLE,
-    MOMENTARY
+    MOMENTARY,
+    SLIDER
 }
 
 /**
- * A single on-screen control button, bound to a pin-mapped role.
+ * A single on-screen control, bound to a pin-mapped role.
  *
  * This is deliberately separate from PinRoleDef: a role describes what
  * a pin *does* electrically (its type, its GPIO), a ControlButtonDef
- * describes how it's *presented* on screen. Splitting these means the
- * same role could eventually back more than one kind of control (a
- * toggle today, a slider later for a dimmable LED) without redefining
- * the underlying pin mapping.
+ * describes how it's *presented* on screen.
  *
- * Only roles with type DIGITAL_OUTPUT are offered when adding a button
- * right now — PWM_OUTPUT and SERVO roles need a continuous control
- * (slider), which isn't built yet. See PIN_MAPPER_ROADMAP.md.
+ * DIGITAL_OUTPUT roles back a TOGGLE or MOMENTARY button. PWM_OUTPUT
+ * roles back a SLIDER. SERVO roles aren't offered yet — firmware has
+ * no angle-control command (SETV is PWM duty only). See
+ * PIN_MAPPER_ROADMAP.md.
  */
 data class ControlButtonDef(
     val id: String,          // unique per profile, e.g. "btn_" + timestamp

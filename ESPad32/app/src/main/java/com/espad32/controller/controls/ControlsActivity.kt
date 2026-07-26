@@ -81,10 +81,11 @@ class ControlsActivity : AppCompatActivity() {
         renderButtons()
     }
 
-    /** Roles eligible to back a button — digital outputs only for now,
-     *  built-in AND custom (a custom "LED" function shows up here too). */
+    /** Roles eligible to back a control — digital outputs (toggle/momentary)
+     *  and PWM outputs (slider), built-in AND custom. SERVO isn't offered —
+     *  firmware has no angle-control command yet. */
     private fun eligibleRoles() = RoleResolver.effectiveRoles(currentProfile, customRoleStorage)
-        .filter { it.type == RoleType.DIGITAL_OUTPUT }
+        .filter { it.type == RoleType.DIGITAL_OUTPUT || it.type == RoleType.PWM_OUTPUT }
 
     private fun renderButtons() {
         buttonListContainer.removeAllViews()
@@ -99,6 +100,11 @@ class ControlsActivity : AppCompatActivity() {
         val role = RoleResolver.effectiveRoles(currentProfile, customRoleStorage).find { it.key == btn.roleKey }
         val boardKey = pinStorage.loadSelectedBoard(currentProfile.key, currentProfile.boardKey)
         val gpio = pinStorage.load(currentProfile.key, boardKey, currentProfile.defaults)[btn.roleKey]
+
+        if (btn.controlType == ControlType.SLIDER) {
+            return buildSliderRow(btn, role, gpio)
+        }
+
         val isOn = buttonStorage.getState(currentProfile.key, btn.id)
 
         val row = LinearLayout(this).apply {
@@ -142,6 +148,75 @@ class ControlsActivity : AppCompatActivity() {
         return row
     }
 
+    private fun buildSliderRow(btn: ControlButtonDef, role: com.espad32.controller.pinmapper.PinRoleDef?, gpio: Int?): android.view.View {
+        val currentValue = buttonStorage.getValue(currentProfile.key, btn.id)
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 18, 20, 12)
+            setBackgroundColor(Color.parseColor("#181D23"))
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.bottomMargin = 6
+            layoutParams = params
+        }
+
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val infoCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        infoCol.addView(TextView(this).apply {
+            text = btn.label
+            setTextColor(Color.parseColor("#E7EBEE"))
+            textSize = 14f
+        })
+        infoCol.addView(TextView(this).apply {
+            text = "${role?.label ?: btn.roleKey} · GPIO ${gpio ?: "?"} · pwm"
+            setTextColor(Color.parseColor("#5F6A73"))
+            textSize = 10.5f
+        })
+        val valueLabel = TextView(this).apply {
+            text = currentValue.toString()
+            setTextColor(Color.parseColor("#E3A458"))
+            textSize = 16f
+            setPadding(16, 0, 0, 0)
+        }
+        headerRow.addView(infoCol)
+        headerRow.addView(valueLabel)
+        container.addView(headerRow)
+
+        val seekBar = android.widget.SeekBar(this).apply {
+            max = 255
+            progress = currentValue
+        }
+        seekBar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: android.widget.SeekBar?, value: Int, fromUser: Boolean) {
+                valueLabel.text = value.toString()
+            }
+            override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {
+                // Only send once the user lifts their finger — sending on
+                // every intermediate onProgressChanged tick would flood
+                // the single-client TCP connection with dozens of
+                // commands per second for a single drag gesture.
+                val value = sb?.progress ?: 0
+                buttonStorage.setValue(currentProfile.key, btn.id, value)
+                log("\"${btn.label}\" -> $value — sending...")
+                DeviceCommand.sendSetValue(btn.roleKey, value) { response ->
+                    log(response ?: "\"${btn.label}\": no response (check connection)")
+                }
+            }
+        })
+        container.addView(seekBar)
+        container.setOnLongClickListener { showEditButtonDialog(btn); true }
+        return container
+    }
+
     private fun handleTap(btn: ControlButtonDef) {
         when (btn.controlType) {
             ControlType.TOGGLE -> {
@@ -162,6 +237,10 @@ class ControlsActivity : AppCompatActivity() {
                     log(response ?: "\"${btn.label}\": no response (check connection)")
                 }
             }
+            ControlType.SLIDER -> {
+                // Never actually reached — slider rows use their own
+                // SeekBar listener (buildSliderRow), not handleTap.
+            }
         }
         renderButtons()
     }
@@ -173,7 +252,7 @@ class ControlsActivity : AppCompatActivity() {
         }
 
         if (eligible.isEmpty()) {
-            log("No available digital-output roles left to add a button for.")
+            log("No available roles left to add a control for.")
             return
         }
 
@@ -191,35 +270,57 @@ class ControlsActivity : AppCompatActivity() {
             text = "Role"
             setPadding(0, 24, 0, 4)
         })
+
+        // Behavior section rebuilds depending on the selected role's type —
+        // DIGITAL_OUTPUT offers Toggle/Momentary, PWM_OUTPUT is always a
+        // slider (no choice to make), so there's nothing to tap.
+        val behaviorLabel = TextView(this).apply {
+            text = "Behavior"
+            setPadding(0, 24, 0, 4)
+        }
+        val behaviorContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+
         var selectedRole = eligible.first()
+        var selectedType = if (selectedRole.type == RoleType.PWM_OUTPUT) ControlType.SLIDER else ControlType.TOGGLE
+
+        fun rebuildBehaviorSection() {
+            behaviorContainer.removeAllViews()
+            if (selectedRole.type == RoleType.PWM_OUTPUT) {
+                selectedType = ControlType.SLIDER
+                behaviorContainer.addView(TextView(this).apply {
+                    text = "Slider (0-255) — the only option for a PWM function"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#5F6A73"))
+                })
+            } else {
+                selectedType = ControlType.TOGGLE
+                val toggleBtn = Button(this).apply { text = "Toggle"; isAllCaps = false }
+                val momentaryBtn = Button(this).apply { text = "Momentary"; isAllCaps = false }
+                toggleBtn.setOnClickListener { selectedType = ControlType.TOGGLE }
+                momentaryBtn.setOnClickListener { selectedType = ControlType.MOMENTARY }
+                behaviorContainer.addView(toggleBtn)
+                behaviorContainer.addView(momentaryBtn)
+            }
+        }
+
         val roleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         eligible.forEach { role ->
             val roleBtn = Button(this).apply {
-                text = role.label
+                text = role.label + if (role.type == RoleType.PWM_OUTPUT) " (PWM)" else ""
                 textSize = 11f
                 isAllCaps = false
                 setOnClickListener {
                     selectedRole = role
                     if (labelInput.text.isBlank()) labelInput.setText(role.label)
+                    rebuildBehaviorSection()
                 }
             }
             roleRow.addView(roleBtn)
         }
         container.addView(roleRow)
-
-        container.addView(TextView(this).apply {
-            text = "Behavior"
-            setPadding(0, 24, 0, 4)
-        })
-        var selectedType = ControlType.TOGGLE
-        val typeRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val toggleBtn = Button(this).apply { text = "Toggle"; isAllCaps = false }
-        val momentaryBtn = Button(this).apply { text = "Momentary"; isAllCaps = false }
-        toggleBtn.setOnClickListener { selectedType = ControlType.TOGGLE }
-        momentaryBtn.setOnClickListener { selectedType = ControlType.MOMENTARY }
-        typeRow.addView(toggleBtn)
-        typeRow.addView(momentaryBtn)
-        container.addView(typeRow)
+        container.addView(behaviorLabel)
+        container.addView(behaviorContainer)
+        rebuildBehaviorSection() // reflect the default-selected role immediately
 
         AlertDialog.Builder(this)
             .setTitle("Add Button")

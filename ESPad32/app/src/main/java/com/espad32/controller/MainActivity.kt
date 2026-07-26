@@ -602,6 +602,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
                 }
             }
+            com.espad32.controller.controls.ControlType.SLIDER -> {
+                // Gamepad buttons can't drive a continuous slider value —
+                // that needs axis mapping, which is separate, unbuilt
+                // work (see PIN_MAPPER_ROADMAP.md). A gamepad button
+                // mapped to a PWM/slider function has nothing sensible
+                // to do here yet.
+                CarLogger.log("Controls", "\"${btn.label}\" is a slider — gamepad buttons can't drive it yet, only axes can (not built).")
+            }
         }
     }
 
@@ -710,7 +718,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         container.removeAllViews()
         val profileKey = ActiveProfile.get(this, Profiles.TRAIN.key)
         val profile = Profiles.ALL.find { it.key == profileKey } ?: Profiles.TRAIN
+        // SLIDER controls (PWM roles) aren't rendered here — the compact
+        // pill-button panel has no slider widget yet. They're fully
+        // usable from the Controls screen; this is a scoped decision,
+        // not a bug. See PIN_MAPPER_ROADMAP.md.
         val buttons = controlButtonStorage.loadButtons(profile.key)
+            .filter { it.controlType != com.espad32.controller.controls.ControlType.SLIDER }
 
         // Chunk into rows of up to 4, matching the density of the fixed
         // rows above (Photo/Record/Log/Matrix/Settings is 5, LED row is 4).
@@ -770,6 +783,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, true) { response ->
                         CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
                     }
+                }
+                com.espad32.controller.controls.ControlType.SLIDER -> {
+                    // Never reached — SLIDER buttons are filtered out
+                    // before reaching this panel (renderLiveButtons).
                 }
             }
             renderLiveButtons()

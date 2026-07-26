@@ -23,6 +23,11 @@ object DeviceCommand {
         sendRaw("SET $role ${if (on) 1 else 0}\n", onResult)
     }
 
+    /** Sends SETV <role> <0-255> for PWM_OUTPUT roles (motor speed, dimming, etc). */
+    fun sendSetValue(role: String, value: Int, onResult: (String?) -> Unit) {
+        sendRaw("SETV $role $value\n", onResult)
+    }
+
     /**
      * Sends any single-line command (a SET command, or a full JSON pin
      * config payload — both are just one line ending in \n) and captures

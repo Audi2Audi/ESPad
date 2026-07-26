@@ -60,4 +60,15 @@ class ControlButtonStorage(context: Context) {
     fun setState(profileKey: String, buttonId: String, isOn: Boolean) {
         prefs.edit().putBoolean(stateKey(profileKey, buttonId), isOn).apply()
     }
+
+    private fun valueKey(profileKey: String, buttonId: String) = "value__${profileKey}__$buttonId"
+
+    /** Last-known slider value (0-255) for a SLIDER-type button. */
+    fun getValue(profileKey: String, buttonId: String): Int {
+        return prefs.getInt(valueKey(profileKey, buttonId), 0)
+    }
+
+    fun setValue(profileKey: String, buttonId: String, value: Int) {
+        prefs.edit().putInt(valueKey(profileKey, buttonId), value).apply()
+    }
 }

@@ -380,12 +380,51 @@ class PinMapperActivity : AppCompatActivity() {
         }
         container.addView(groupInput)
 
-        // Only DIGITAL_OUTPUT is offered here — that's the only role
-        // type Controls can actually back with a button right now.
-        // PWM/servo/etc need a slider UI that doesn't exist yet.
+        val typeLabel = TextView(this).apply {
+            text = "Type"
+            setPadding(0, 24, 0, 4)
+        }
+        container.addView(typeLabel)
+
+        var selectedType = RoleType.DIGITAL_OUTPUT
+        val typeRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val digitalBtn = Button(this).apply {
+            text = "On/Off"
+            isAllCaps = false
+            setBackgroundColor(Color.parseColor("#262D35"))
+            setTextColor(Color.parseColor("#E3A458"))
+        }
+        val pwmBtn = Button(this).apply {
+            text = "PWM (0-255)"
+            isAllCaps = false
+            setBackgroundColor(Color.TRANSPARENT)
+            setTextColor(Color.parseColor("#8A939C"))
+        }
+        digitalBtn.setOnClickListener {
+            selectedType = RoleType.DIGITAL_OUTPUT
+            digitalBtn.setBackgroundColor(Color.parseColor("#262D35"))
+            digitalBtn.setTextColor(Color.parseColor("#E3A458"))
+            pwmBtn.setBackgroundColor(Color.TRANSPARENT)
+            pwmBtn.setTextColor(Color.parseColor("#8A939C"))
+        }
+        pwmBtn.setOnClickListener {
+            selectedType = RoleType.PWM_OUTPUT
+            pwmBtn.setBackgroundColor(Color.parseColor("#262D35"))
+            pwmBtn.setTextColor(Color.parseColor("#E3A458"))
+            digitalBtn.setBackgroundColor(Color.TRANSPARENT)
+            digitalBtn.setTextColor(Color.parseColor("#8A939C"))
+        }
+        typeRow.addView(digitalBtn)
+        typeRow.addView(pwmBtn)
+        container.addView(typeRow)
+
+        // SERVO isn't offered — firmware has no angle-control command
+        // yet (SETV is PWM duty only), so creating a SERVO role here
+        // would produce something Controls can't actually drive
+        // correctly. See PIN_MAPPER_ROADMAP.md.
         val noteText = TextView(this).apply {
-            text = "New functions are created as a simple on/off output " +
-                "(the only type Controls buttons support right now)."
+            text = "On/Off backs a toggle button in Controls. PWM backs a slider " +
+                "(0-255) — servo angle control isn't supported by the firmware yet."
             textSize = 11f
             setTextColor(Color.parseColor("#5F6A73"))
             setPadding(0, 20, 0, 0)
@@ -401,7 +440,7 @@ class PinMapperActivity : AppCompatActivity() {
                 val existingKeys = effectiveRoles().map { it.key }.toSet()
                 val key = customRoleStorage.slugify(label, existingKeys)
 
-                customRoles.add(CustomRole(key, label, group, RoleType.DIGITAL_OUTPUT))
+                customRoles.add(CustomRole(key, label, group, selectedType))
                 customRoleStorage.saveCustomRoles(currentProfile.key, customRoles)
                 log("Added function \"$label\".")
                 renderRoles()
