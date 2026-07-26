@@ -333,13 +333,17 @@ class PinMapperActivity : AppCompatActivity() {
 
         storage.save(currentProfile.key, currentBoardKey, assignments)
         val payload = storage.buildPayload(currentProfile, assignments)
-        log("VALIDATION OK — saved locally for board \"${Boards.byKey(currentBoardKey).displayName}\".")
-        log("Payload ready to send to device:")
-        log(payload.toString())
+        log("Saved locally for board \"${Boards.byKey(currentBoardKey).displayName}\".")
+        log("Sending to device...")
 
-        // TODO: actually transmit `payload` to the ESP32 here once the
-        // transport (TCP/BLE) for this profile is decided, then wait
-        // for the firmware's own ACK/NACK before declaring success.
+        com.espad32.controller.controls.DeviceCommand.sendRaw(payload.toString()) { response ->
+            when {
+                response == null -> log("No response from device (check connection).")
+                response.startsWith("VALIDATION OK") -> log("Device confirmed: $response")
+                response.startsWith("NACK") -> log("Device rejected config: $response")
+                else -> log("Device response: $response")
+            }
+        }
     }
 
     private fun log(message: String) {

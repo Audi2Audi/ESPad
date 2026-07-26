@@ -157,16 +157,27 @@ the original car app's port), tested from Termux via `nc 192.168.4.1
 4000` — identical `SET test_led 1/0` commands, identical LED response,
 now over the network instead of USB.
 
-**Confirmed working (app-wired):** the app now actually sends this
-command instead of just logging it locally.
-- New `controls/DeviceCommand.kt`: sends `SET <role> <0|1>` through
+**Confirmed working (app-wired):** the app now actually sends commands
+instead of just logging them locally, on both sides:
+- **Controls buttons** send `SET <role> <0|1>` (see below, unchanged
+  from the original entry).
+- **Pin Mapper's "Validate & Save"** now also pushes the full JSON pin
+  config payload to the device (previously local-only, same TODO as
+  Controls had). Response is a single captured line — `VALIDATION OK`
+  means the device accepted and saved the config to its own NVS;
+  `NACK: ...` means it was rejected (e.g. a reserved/invalid pin) even
+  though the app-side validation passed, which can legitimately happen
+  if app and firmware validation rules ever drift out of sync.
+- New `controls/DeviceCommand.kt`: `sendSet()` for role toggles,
+  `sendRaw()` as the general-purpose version both Pin Mapper and
+  Controls now share — sends any single-line command through
   `MainTcpHolder` — the same shared connection singleton other screens
   (`OtaActivity`, `MatrixCanvasActivity`, `SettingsDialogFragment`)
   already use, rather than opening a second socket. This isn't just
   convenient — the firmware's command server only accepts **one client
   at a time**, so a second connection would hang waiting for `accept()`.
 - Both the Controls screen and the live buttons on the main driving
-  screen now call `DeviceCommand.sendSet()` and log the device's actual
+  screen call `DeviceCommand.sendSet()` and log the device's actual
   response instead of "local only."
 - **Fixed a bug found along the way:** `MainActivity.handleIncomingData`
   only ever routed `CMD_WIFI*` responses to `MainTcpHolder.onNextData`.

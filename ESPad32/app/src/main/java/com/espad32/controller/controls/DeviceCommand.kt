@@ -20,6 +20,19 @@ object DeviceCommand {
     private const val TIMEOUT_MS = 3000L
 
     fun sendSet(role: String, on: Boolean, onResult: (String?) -> Unit) {
+        sendRaw("SET $role ${if (on) 1 else 0}\n", onResult)
+    }
+
+    /**
+     * Sends any single-line command (a SET command, or a full JSON pin
+     * config payload — both are just one line ending in \n) and captures
+     * the device's first response line. For multi-line firmware replies
+     * (JSON payloads get VALIDATION OK / SAVED to NVS / ACK / a config
+     * dump), only that first line is captured — enough to know success
+     * (VALIDATION OK) vs failure (NACK: ...), even though the fuller
+     * dump that follows isn't surfaced here.
+     */
+    fun sendRaw(command: String, onResult: (String?) -> Unit) {
         if (MainTcpHolder.enqueue == null) {
             onResult(null)
             return
@@ -37,7 +50,7 @@ object DeviceCommand {
             }
         }
 
-        MainTcpHolder.enqueue?.invoke("SET $role ${if (on) 1 else 0}\n")
+        MainTcpHolder.enqueue?.invoke(if (command.endsWith("\n")) command else "$command\n")
 
         mainHandler.postDelayed({
             if (!resumed) {
