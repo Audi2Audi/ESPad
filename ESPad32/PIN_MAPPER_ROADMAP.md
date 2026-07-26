@@ -433,19 +433,38 @@ ESP32/Arduino project" as a real goal:
 
 - **Suspected ESP32 crash/reboot during gamepad axis PWM testing** — app
   showed "Reconnecting..." after driving the axis-mapped PWM slider for
-  a bit. Not root-caused yet, deferred for a dedicated session. Worth
-  checking when picked back up:
-  - Whether it's actually a crash (full reboot — check Serial Monitor
-    for a boot banner reappearing) vs. just the same stale-TCP-client
-    issue from earlier (v4's fix), vs. an unrelated WiFi hiccup.
-  - Whether the axis rate limit (80ms / ~12.5 sends/sec) is actually
-    being respected, or whether rapid repeated `ledcWrite()` calls
-    combined with TCP/WiFi traffic in the same `loop()` iteration could
-    be tripping the ESP32's task watchdog.
-  - Whether this only happens during axis-driven PWM (continuous rapid
-    changes) or also with the Controls slider's single on-release send
-    (which would point to something in the PWM/LEDC path itself rather
-    than to rate/frequency of commands).
+  a bit. Confirmed by the user to occur specifically during rapid axis
+  movement (not observed with the Controls slider's single on-release
+  send) — that difference is a real diagnostic signal, not just an
+  unconfirmed guess.
+
+  **Leading hypothesis: Arduino `String` heap fragmentation.** Every
+  `SETV` call in the firmware allocates several dynamic `String`
+  objects (`role`, `valueStr`, substrings, the response text). Arduino's
+  `String` class on ESP32 is a well-documented source of heap
+  fragmentation under *frequent* allocate/free cycles — sustained rapid
+  small allocations, not necessarily a huge total count, which matches
+  a gamepad stick's behavior (many quick SETV sends) far better than
+  the slider's single send.
+
+  **When picked back up:**
+  - Add `Serial.println(ESP.getFreeHeap())` at the top of `loop()` or
+    inside `handleSetValueCommand` to directly observe whether free
+    heap trends downward during sustained axis movement — would
+    confirm or rule out fragmentation with actual data instead of more
+    guessing.
+  - If confirmed, the fix is rewriting `handleSetValueCommand` (and
+    ideally the other command handlers) to avoid Arduino `String`
+    allocation entirely — parse with C-string functions
+    (`strtok`/`atoi`/fixed char buffers) instead of `String.substring()`.
+  - Quick mitigation in the meantime, if needed before a proper rewrite:
+    increase the axis rate-limit interval (currently 80ms) to reduce
+    allocation frequency, though this only reduces the rate of
+    fragmentation rather than fixing the underlying cause.
+  - Still worth confirming it's actually a reboot (Serial Monitor
+    showing the boot banner reappear) rather than the earlier
+    stale-TCP-client issue or an unrelated WiFi hiccup, before assuming
+    the heap theory is fully confirmed.
 
 ## Open questions (not yet decided)
 
