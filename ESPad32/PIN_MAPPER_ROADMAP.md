@@ -121,11 +121,46 @@ to the phone directly). Revisit only if a specific project needs it.
 - [ ] Reordering buttons (drag-and-drop) once someone has more than a
       handful — not needed yet with only 1-2 buttons per profile
 
-## Medium-term: user-defined devices
+## Medium-term: user-defined device profiles (sharpened end goal)
 
-- [ ] "New Device" flow: pick a board → name the device → add roles one
-      at a time (with type) → assign pins → save as a new profile
-      alongside Train/RC Car
+**The actual end goal (confirmed):** a settings-driven flow —
+pick your board → pick/assign your pins → name your functions → add
+and name your buttons — producing a **user-created device profile**,
+not one of the two hardcoded `Profiles.TRAIN`/`Profiles.RC_CAR`
+entries. With that in place, someone with two trains (or a train and
+an RC car, or three unrelated projects) creates a named profile for
+each and switches between them, rather than the app only ever knowing
+about its two built-in device types.
+
+This is a real architecture change, not just new UI on top of what
+exists — `DeviceProfile` today is a hardcoded `object Profiles { val
+TRAIN = ...; val RC_CAR = ... }`. Getting to user-created profiles
+means:
+
+- [ ] `DeviceProfile` (or a new parallel type) needs to be something a
+      user creates and persists, not a compile-time constant — a
+      "New Device" flow: name it → pick a board → add functions one at
+      a time (reusing the custom-role creation flow already built) →
+      assign pins → save as its own profile, stored alongside (not
+      replacing) the built-in Train/RC Car ones
+- [ ] A **settings entry point** that walks through board → pins →
+      functions → buttons as one guided sequence, instead of requiring
+      someone to already know to visit Pin Mapper then Controls
+      separately
+- [ ] A **profile switcher** — likely on the main screen — to pick
+      which device you're currently driving. `ActiveProfile` already
+      exists as the "which profile is active" concept (currently
+      last-selected-wins from Pin Mapper/Controls); this becomes the
+      real UI for that instead of an implicit side effect
+- [ ] **Real wrinkle to solve, not yet solved:** there's exactly one
+      physical connection at a time (`MainTcpHolder`, one IP). Switching
+      which *device profile* you're configuring in software is easy;
+      switching which *physical board* you're actually connected to
+      means also changing the IP being connected to. Profile switching
+      and connection/WiFi settings are linked in a way they aren't
+      today — this is where the "editable per-device SSID/password"
+      note above connects to this work directly, rather than being a
+      separate feature
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI
