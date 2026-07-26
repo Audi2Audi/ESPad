@@ -141,10 +141,20 @@ class ControlsActivity : AppCompatActivity() {
             ControlType.TOGGLE -> {
                 val newState = !buttonStorage.getState(currentProfile.key, btn.id)
                 buttonStorage.setState(currentProfile.key, btn.id, newState)
-                log("\"${btn.label}\" → ${if (newState) "ON" else "OFF"} (local only — not yet sent to device).")
+                log("\"${btn.label}\" → ${if (newState) "ON" else "OFF"} — sending...")
+                DeviceCommand.sendSet(btn.roleKey, newState) { response ->
+                    log(response ?: "\"${btn.label}\": no response (check connection)")
+                    renderButtons()
+                }
             }
             ControlType.MOMENTARY -> {
-                log("\"${btn.label}\" pressed (local only — not yet sent to device).")
+                // True press/release isn't wired yet (needs touch-down/up
+                // handling, not just a tap) — see PIN_MAPPER_ROADMAP.md.
+                // For now this just sends ON; nothing turns it back off.
+                log("\"${btn.label}\" pressed — sending...")
+                DeviceCommand.sendSet(btn.roleKey, true) { response ->
+                    log(response ?: "\"${btn.label}\": no response (check connection)")
+                }
             }
         }
         renderButtons()

@@ -151,6 +151,43 @@ chain (saved role → resolved GPIO → real hardware output) works
 correctly — the prerequisite before wiring the same command up over
 TCP instead of Serial.
 
+**Confirmed working (WiFi/TCP, still phone-as-manual-client):** same
+sketch extended with a WiFi soft-AP + TCP server (port 4000, matching
+the original car app's port), tested from Termux via `nc 192.168.4.1
+4000` — identical `SET test_led 1/0` commands, identical LED response,
+now over the network instead of USB.
+
+**Confirmed working (app-wired):** the app now actually sends this
+command instead of just logging it locally.
+- New `controls/DeviceCommand.kt`: sends `SET <role> <0|1>` through
+  `MainTcpHolder` — the same shared connection singleton other screens
+  (`OtaActivity`, `MatrixCanvasActivity`, `SettingsDialogFragment`)
+  already use, rather than opening a second socket. This isn't just
+  convenient — the firmware's command server only accepts **one client
+  at a time**, so a second connection would hang waiting for `accept()`.
+- Both the Controls screen and the live buttons on the main driving
+  screen now call `DeviceCommand.sendSet()` and log the device's actual
+  response instead of "local only."
+- **Fixed a bug found along the way:** `MainActivity.handleIncomingData`
+  only ever routed `CMD_WIFI*` responses to `MainTcpHolder.onNextData`.
+  This meant `OtaActivity`'s firmware version query was silently always
+  timing out — it was never actually wired to receive its response. Added
+  a generic passthrough for anything not already handled by CMD_WIFI/
+  CMD_POWER, which both fixes that latent bug and is what our SET
+  command responses now rely on.
+- **Known limitation, not yet solved:** responses aren't tagged with
+  request IDs. If a `SET` response and some other unsolicited line
+  (e.g. a `CMD_POWER` battery poll reply, or — since our test firmware
+  doesn't understand `CMD_POWER` — the JSON-parse `NACK` it sends back
+  instead) arrive at the same moment, the one-shot response handler
+  could attribute the wrong line to the wrong command. Low probability
+  for manual testing, but real — proper request/response framing
+  (matching a command ID) is worth doing before this is load-bearing
+  for anything more than testing.
+- **Momentary buttons still just send ON** — true press/release needs
+  touch-down/up handling (tracked above), not implemented yet, so
+  nothing currently sends the matching OFF.
+
 **Future settings feature (not built yet):** the test sketch currently
 hardcodes a fixed AP SSID/password ("ESPad_Test" / "espad1234"). Once
 someone has more than one ESP32 device (train, RC car, future builds),

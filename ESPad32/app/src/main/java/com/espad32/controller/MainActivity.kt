@@ -378,6 +378,17 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 tvBattery.text = "🔋 ${voltage}V"
                 updateEsp32Battery(volts)
             }
+            return
+        }
+
+        // Generic passthrough for anyone waiting on the next line via
+        // MainTcpHolder.onNextData (Pin Mapper/Controls SET command
+        // responses, OtaActivity's version query, etc). CMD_WIFI and
+        // CMD_POWER are already fully handled above and return before
+        // reaching here, so this only fires for everything else.
+        MainTcpHolder.onNextData?.let { cb ->
+            cb(data)
+            MainTcpHolder.onNextData = null
         }
     }
 
@@ -663,10 +674,19 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 ControlType.TOGGLE -> {
                     val newState = !controlButtonStorage.getState(profileKey, btn.id)
                     controlButtonStorage.setState(profileKey, btn.id, newState)
-                    CarLogger.log("Controls", "\"${btn.label}\" -> ${if (newState) "ON" else "OFF"} (local only, not yet sent to device)")
+                    CarLogger.log("Controls", "\"${btn.label}\" -> ${if (newState) "ON" else "OFF"} — sending...")
+                    com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, newState) { response ->
+                        CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+                        renderLiveButtons()
+                    }
                 }
                 ControlType.MOMENTARY -> {
-                    CarLogger.log("Controls", "\"${btn.label}\" pressed (local only, not yet sent to device)")
+                    // Sends ON only — true press/release isn't wired yet,
+                    // see PIN_MAPPER_ROADMAP.md.
+                    CarLogger.log("Controls", "\"${btn.label}\" pressed — sending...")
+                    com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, true) { response ->
+                        CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+                    }
                 }
             }
             renderLiveButtons()
