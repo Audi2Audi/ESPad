@@ -179,6 +179,26 @@ your device, then connect to it."
       remember and re-enter it. This is where the earlier "editable
       per-device SSID/password" note connects directly to this work,
       rather than being a separate feature.
+- [ ] **Final piece of the settings flow: map GameSir/gamepad buttons to
+      user-defined functions too**, not just on-screen Controls buttons.
+      There's already real infrastructure for this — `ControllerMapping.kt`
+      + `ControllerMappingActivity.kt` is a full gamepad button/axis
+      remapping system with presets, wired to real `KeyEvent`/
+      `MotionEvent` handling. It's currently hardcoded to the old
+      Freenove-specific `ButtonFunction` enum (LED_CYCLE, SERVO_RESET,
+      etc), some of which no longer correspond to anything now that
+      those were removed from the on-screen panel. Generalizing this
+      means a gamepad button press needs to trigger the same
+      `DeviceCommand.sendSet()` path an on-screen Controls tap already
+      does, targeting whichever custom/built-in role the user assigns —
+      not a fixed enum of car commands.
+      Same split as elsewhere in this doc: **buttons** (on/off — face
+      buttons, triggers, D-pad) are the easy half, since they map
+      directly onto `DIGITAL_OUTPUT` roles that already work end to end.
+      **Axes/sticks** (continuous values — steering, throttle) need the
+      PWM/servo slider equivalent that's already flagged as unbuilt
+      above, so gamepad-axis-to-custom-function mapping naturally
+      follows behind that, not before it.
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI
