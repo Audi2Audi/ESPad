@@ -14,11 +14,14 @@ import com.espad32.controller.pinmapper.PinConfigStorage
 import com.espad32.controller.pinmapper.Profiles
 import com.espad32.controller.pinmapper.RoleType
 import com.espad32.controller.pinmapper.DeviceProfile
+import com.espad32.controller.pinmapper.CustomRoleStorage
+import com.espad32.controller.pinmapper.RoleResolver
 
 class ControlsActivity : AppCompatActivity() {
 
     private lateinit var buttonStorage: ControlButtonStorage
     private lateinit var pinStorage: PinConfigStorage
+    private lateinit var customRoleStorage: CustomRoleStorage
     private var currentProfile: DeviceProfile = Profiles.TRAIN
     private var buttons: MutableList<ControlButtonDef> = mutableListOf()
     private val logLines = mutableListOf<String>()
@@ -34,6 +37,7 @@ class ControlsActivity : AppCompatActivity() {
 
         buttonStorage = ControlButtonStorage(this)
         pinStorage = PinConfigStorage(this)
+        customRoleStorage = CustomRoleStorage(this)
 
         profileTabContainer = findViewById(R.id.controlsProfileTabContainer)
         buttonListContainer = findViewById(R.id.buttonListContainer)
@@ -77,8 +81,10 @@ class ControlsActivity : AppCompatActivity() {
         renderButtons()
     }
 
-    /** Roles eligible to back a button — digital outputs only for now. */
-    private fun eligibleRoles() = currentProfile.roles.filter { it.type == RoleType.DIGITAL_OUTPUT }
+    /** Roles eligible to back a button — digital outputs only for now,
+     *  built-in AND custom (a custom "LED" function shows up here too). */
+    private fun eligibleRoles() = RoleResolver.effectiveRoles(currentProfile, customRoleStorage)
+        .filter { it.type == RoleType.DIGITAL_OUTPUT }
 
     private fun renderButtons() {
         buttonListContainer.removeAllViews()
@@ -90,7 +96,7 @@ class ControlsActivity : AppCompatActivity() {
     }
 
     private fun buildButtonRow(btn: ControlButtonDef): android.view.View {
-        val role = currentProfile.roles.find { it.key == btn.roleKey }
+        val role = RoleResolver.effectiveRoles(currentProfile, customRoleStorage).find { it.key == btn.roleKey }
         val boardKey = pinStorage.loadSelectedBoard(currentProfile.key, currentProfile.boardKey)
         val gpio = pinStorage.load(currentProfile.key, boardKey, currentProfile.defaults)[btn.roleKey]
         val isOn = buttonStorage.getState(currentProfile.key, btn.id)

@@ -1,10 +1,12 @@
 package com.espad32.controller.pinmapper
 
+import android.app.AlertDialog
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -13,9 +15,12 @@ import com.espad32.controller.R // adjust if your R class lives elsewhere
 class PinMapperActivity : AppCompatActivity() {
 
     private lateinit var storage: PinConfigStorage
+    private lateinit var customRoleStorage: CustomRoleStorage
     private var currentProfile: DeviceProfile = Profiles.TRAIN
     private var currentBoardKey: String = Profiles.TRAIN.boardKey
     private var assignments: MutableMap<String, Int?> = mutableMapOf()
+    private var customRoles: MutableList<CustomRole> = mutableListOf()
+    private var labelOverrides: MutableMap<String, String> = mutableMapOf()
     private var pendingRoleKey: String? = null
     private val logLines = mutableListOf<String>()
 
@@ -32,6 +37,7 @@ class PinMapperActivity : AppCompatActivity() {
         setContentView(R.layout.activity_pin_mapper)
 
         storage = PinConfigStorage(this)
+        customRoleStorage = CustomRoleStorage(this)
 
         profileTabContainer = findViewById(R.id.profileTabContainer)
         boardTabContainer = findViewById(R.id.boardTabContainer)
@@ -43,6 +49,7 @@ class PinMapperActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.resetButton).setOnClickListener { resetDefaults() }
         findViewById<Button>(R.id.saveButton).setOnClickListener { validateAndSave() }
+        findViewById<Button>(R.id.addRoleButton).setOnClickListener { showAddRoleDialog() }
 
         buildProfileTabs()
         loadProfile(Profiles.TRAIN)
@@ -75,12 +82,29 @@ class PinMapperActivity : AppCompatActivity() {
         com.espad32.controller.controls.ActiveProfile.set(this, profile.key)
         currentBoardKey = storage.loadSelectedBoard(profile.key, profile.boardKey)
         assignments = storage.load(profile.key, currentBoardKey, profile.defaults)
+        customRoles = customRoleStorage.loadCustomRoles(profile.key)
+        labelOverrides = customRoleStorage.loadLabelOverrides(profile.key)
         pendingRoleKey = null
         log("Loaded profile \"${profile.displayName}\".")
         buildProfileTabs()
         buildBoardTabs()
         renderBoard()
         renderRoles()
+    }
+
+    /**
+     * Built-in roles (with any label override applied) plus user-added
+     * custom roles, merged into one list — everything else in this
+     * Activity should read roles through this instead of
+     * currentProfile.roles directly, so custom/renamed functions show
+     * up everywhere the built-in ones do.
+     */
+    private fun effectiveRoles(): List<PinRoleDef> {
+        val builtIn = currentProfile.roles.map { r ->
+            PinRoleDef(r.key, labelOverrides[r.key] ?: r.label, r.group, r.type)
+        }
+        val custom = customRoles.map { c -> PinRoleDef(c.key, c.label, c.group, c.type) }
+        return builtIn + custom
     }
 
     private fun buildBoardTabs() {
@@ -118,7 +142,7 @@ class PinMapperActivity : AppCompatActivity() {
         val loaded = storage.load(currentProfile.key, board.key, emptyMap())
         val dropped = mutableListOf<String>()
 
-        currentProfile.roles.forEach { role ->
+        effectiveRoles().forEach { role ->
             val existingGpio = assignments[role.key]
             val carriedGpio = loaded[role.key]
             when {
@@ -149,9 +173,15 @@ class PinMapperActivity : AppCompatActivity() {
     private fun resetDefaults() {
         currentBoardKey = currentProfile.boardKey
         storage.saveSelectedBoard(currentProfile.key, currentBoardKey)
+        // "Reset defaults" only applies to built-in roles (that's what
+        // Profiles.TRAIN/RC_CAR.defaults actually describes) — custom
+        // roles have no firmware default, so their assignments are left
+        // exactly as they were rather than getting wiped.
+        val customAssignments = customRoles.associate { it.key to assignments[it.key] }
         assignments = currentProfile.defaults.mapValues { it.value as Int? }.toMutableMap()
+        assignments.putAll(customAssignments)
         pendingRoleKey = null
-        log("Reset to firmware defaults (board: ${Boards.byKey(currentBoardKey).displayName}).")
+        log("Reset built-in roles to firmware defaults (board: ${Boards.byKey(currentBoardKey).displayName}).")
         buildBoardTabs()
         renderBoard()
         renderRoles()
@@ -215,7 +245,7 @@ class PinMapperActivity : AppCompatActivity() {
         labelCol.addView(silk)
         if (assignedRole != null) {
             val roleLabel = TextView(this).apply {
-                text = currentProfile.roles.find { it.key == assignedRole }?.label ?: assignedRole
+                text = effectiveRoles().find { it.key == assignedRole }?.label ?: assignedRole
                 textSize = 9f
                 setTextColor(Color.parseColor("#E3A458"))
             }
@@ -243,7 +273,7 @@ class PinMapperActivity : AppCompatActivity() {
         }
         assignments[roleKey] = gpio
 
-        val roleLabel = currentProfile.roles.find { it.key == roleKey }?.label ?: roleKey
+        val roleLabel = effectiveRoles().find { it.key == roleKey }?.label ?: roleKey
         if (PinValidation.isRisky(pin)) {
             log("GPIO $gpio assigned to \"$roleLabel\" — ${pin.status?.displayLabel?.lowercase()}.")
         } else {
@@ -257,11 +287,11 @@ class PinMapperActivity : AppCompatActivity() {
 
     private fun renderRoles() {
         roleSectionLabel.text = pendingRoleKey?.let {
-            "TAP A PIN FOR \"${currentProfile.roles.find { r -> r.key == it }?.label?.uppercase()}\""
+            "TAP A PIN FOR \"${effectiveRoles().find { r -> r.key == it }?.label?.uppercase()}\""
         } ?: "FUNCTIONS"
 
         roleContainer.removeAllViews()
-        currentProfile.roles.groupBy { it.group }.forEach { (group, roles) ->
+        effectiveRoles().groupBy { it.group }.forEach { (group, roles) ->
             val groupLabel = TextView(this).apply {
                 text = group.uppercase()
                 textSize = 10.5f
@@ -315,11 +345,112 @@ class PinMapperActivity : AppCompatActivity() {
 
         row.addView(nameView)
         row.addView(valueView)
+        row.setOnLongClickListener {
+            showEditRoleDialog(role)
+            true
+        }
         return row
     }
 
+    private fun showAddRoleDialog() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 0)
+        }
+        val labelInput = EditText(this).apply { hint = "Function label (e.g. LED)" }
+        container.addView(labelInput)
+
+        val groupLabel = TextView(this).apply {
+            text = "Group (optional)"
+            setPadding(0, 24, 0, 4)
+        }
+        container.addView(groupLabel)
+        val groupInput = EditText(this).apply {
+            hint = "e.g. Lights"
+            setText("Custom")
+        }
+        container.addView(groupInput)
+
+        // Only DIGITAL_OUTPUT is offered here — that's the only role
+        // type Controls can actually back with a button right now.
+        // PWM/servo/etc need a slider UI that doesn't exist yet.
+        val noteText = TextView(this).apply {
+            text = "New functions are created as a simple on/off output " +
+                "(the only type Controls buttons support right now)."
+            textSize = 11f
+            setTextColor(Color.parseColor("#5F6A73"))
+            setPadding(0, 20, 0, 0)
+        }
+        container.addView(noteText)
+
+        AlertDialog.Builder(this)
+            .setTitle("Add Function")
+            .setView(container)
+            .setPositiveButton("Add") { _, _ ->
+                val label = labelInput.text.toString().ifBlank { "New Function" }
+                val group = groupInput.text.toString().ifBlank { "Custom" }
+                val existingKeys = effectiveRoles().map { it.key }.toSet()
+                val key = customRoleStorage.slugify(label, existingKeys)
+
+                customRoles.add(CustomRole(key, label, group, RoleType.DIGITAL_OUTPUT))
+                customRoleStorage.saveCustomRoles(currentProfile.key, customRoles)
+                log("Added function \"$label\".")
+                renderRoles()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showEditRoleDialog(role: PinRoleDef) {
+        val isCustom = customRoles.any { it.key == role.key }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 0)
+        }
+        val labelInput = EditText(this).apply { setText(role.label) }
+        container.addView(labelInput)
+
+        val builder = AlertDialog.Builder(this)
+            .setTitle(if (isCustom) "Edit Function" else "Rename Function")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                val newLabel = labelInput.text.toString().ifBlank { role.label }
+                if (isCustom) {
+                    val idx = customRoles.indexOfFirst { it.key == role.key }
+                    if (idx >= 0) {
+                        customRoles[idx] = customRoles[idx].copy(label = newLabel)
+                        customRoleStorage.saveCustomRoles(currentProfile.key, customRoles)
+                    }
+                } else {
+                    labelOverrides[role.key] = newLabel
+                    customRoleStorage.saveLabelOverrides(currentProfile.key, labelOverrides)
+                }
+                log("Renamed function to \"$newLabel\".")
+                renderRoles()
+                renderBoard()
+            }
+            .setNegativeButton("Cancel", null)
+
+        // Built-in roles (motor_dir_a, etc) can be renamed but not
+        // deleted — their key is what firmware/storage actually keys
+        // on, and other profile logic assumes they exist.
+        if (isCustom) {
+            builder.setNeutralButton("Delete") { _, _ ->
+                customRoles.removeAll { it.key == role.key }
+                customRoleStorage.saveCustomRoles(currentProfile.key, customRoles)
+                assignments.remove(role.key)
+                pendingRoleKey = if (pendingRoleKey == role.key) null else pendingRoleKey
+                log("Deleted function \"${role.label}\".")
+                renderRoles()
+                renderBoard()
+            }
+        }
+        builder.show()
+    }
+
     private fun validateAndSave() {
-        val unassigned = currentProfile.roles.filter { assignments[it.key] == null }
+        val unassigned = effectiveRoles().filter { assignments[it.key] == null }
         if (unassigned.isNotEmpty()) {
             log("NACK — ${unassigned.size} role(s) unassigned: ${unassigned.joinToString { it.label }}")
             return

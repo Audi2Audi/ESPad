@@ -81,12 +81,28 @@ to the phone directly). Revisit only if a specific project needs it.
 
 ## Near-term: renaming & custom roles
 
-- [ ] Relabel an existing role (e.g. "Motor direction A" → "Left wheel
-      forward") — straightforward, just an editable text field per role
-- [ ] Add a brand-new role the app doesn't know about yet (e.g. "Fog
-      machine trigger") — `RoleType` now exists (done above), so this is
-      mostly UI work: a "new role" flow that lets someone pick a type
-      and have `PinValidation` filter correctly automatically
+- [x] **Relabel an existing (built-in) role** — long-press any function
+      row in Pin Mapper → rename. Built-in roles (motor_dir_a, etc)
+      store the override separately (`CustomRoleStorage`
+      label-override map) rather than mutating the source data, since
+      other logic depends on the key existing — only the displayed
+      label changes.
+- [x] **Add a brand-new custom role** — "+ Add Function" in Pin Mapper.
+      Solves the original motivating problem directly: previously the
+      only way to test an LED was to repurpose an unrelated built-in
+      role (e.g. "Motor standby") just because its GPIO was free. Now
+      a genuine "LED" function can be created instead. Custom roles are
+      always created as `DIGITAL_OUTPUT` for now (the only type
+      Controls buttons support) and can be renamed or deleted freely
+      (unlike built-ins, which can be renamed but not deleted, since
+      their key is depended on elsewhere).
+      Implementation: `CustomRoleStorage` (per-profile custom role list
+      + label overrides), `RoleResolver.effectiveRoles()` (shared
+      built-in + custom merge for screens that only read the list, e.g.
+      Controls), and `PinMapperActivity.effectiveRoles()` (same merge,
+      inline, since Pin Mapper also needs to mutate the list). Both the
+      Pin Mapper role list and Controls' "Add Button" role picker now
+      show custom roles, not just built-ins.
 
 ## Near-term: Controls screen follow-ups
 
