@@ -132,10 +132,15 @@ an RC car, or three unrelated projects) creates a named profile for
 each and switches between them, rather than the app only ever knowing
 about its two built-in device types.
 
-This is a real architecture change, not just new UI on top of what
-exists — `DeviceProfile` today is a hardcoded `object Profiles { val
-TRAIN = ...; val RC_CAR = ... }`. Getting to user-created profiles
-means:
+**Usage model (confirmed): per-session, not hot-swapping.** This isn't
+about juggling multiple live connections at once — it's "today I drive
+my train, tomorrow my RC car, the day after my robot arm." You pick
+which device you're operating **before** connecting for that session,
+then use it as normal. This simplifies the transport question a lot:
+there's still only one live connection at a time, but that's fine,
+because there's only ever supposed to be one active session anyway.
+No need to solve concurrent connections or live-switching — just "pick
+your device, then connect to it."
 
 - [ ] `DeviceProfile` (or a new parallel type) needs to be something a
       user creates and persists, not a compile-time constant — a
@@ -147,20 +152,21 @@ means:
       functions → buttons as one guided sequence, instead of requiring
       someone to already know to visit Pin Mapper then Controls
       separately
-- [ ] A **profile switcher** — likely on the main screen — to pick
-      which device you're currently driving. `ActiveProfile` already
-      exists as the "which profile is active" concept (currently
-      last-selected-wins from Pin Mapper/Controls); this becomes the
-      real UI for that instead of an implicit side effect
-- [ ] **Real wrinkle to solve, not yet solved:** there's exactly one
-      physical connection at a time (`MainTcpHolder`, one IP). Switching
-      which *device profile* you're configuring in software is easy;
-      switching which *physical board* you're actually connected to
-      means also changing the IP being connected to. Profile switching
-      and connection/WiFi settings are linked in a way they aren't
-      today — this is where the "editable per-device SSID/password"
-      note above connects to this work directly, rather than being a
-      separate feature
+- [ ] A **device picker at session start** — e.g. a launch screen or a
+      menu item on the main screen, picked once before connecting, not
+      swapped mid-session. `ActiveProfile` already exists as the "which
+      profile is active" concept (currently last-selected-wins from Pin
+      Mapper/Controls); this becomes the deliberate "choose your
+      device" moment instead of an implicit side effect of whichever
+      screen you opened last
+- [ ] Each device profile should carry **its own connection info**
+      (AP SSID/password, or IP if on a shared network) alongside its
+      board/pins/functions/buttons — so picking "Train" for today's
+      session also means the app knows which network/IP to connect to
+      for that specific board, without the user having to separately
+      remember and re-enter it. This is where the earlier "editable
+      per-device SSID/password" note connects directly to this work,
+      rather than being a separate feature.
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI
