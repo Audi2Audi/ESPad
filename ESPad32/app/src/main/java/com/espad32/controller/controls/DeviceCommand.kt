@@ -23,9 +23,30 @@ object DeviceCommand {
         sendRaw("SET $role ${if (on) 1 else 0}\n", onResult)
     }
 
-    /** Sends SETV <role> <0-255> for PWM_OUTPUT roles (motor speed, dimming, etc). */
+    /**
+     * Sends SETV <role> <0-255> for PWM_OUTPUT roles (motor speed,
+     * dimming, etc).
+     *
+     * IMPORTANT: `value` here is the INTENDED brightness/speed as the
+     * caller understands it (0 = off, 255 = full) — the actual wire
+     * value is inverted (255 - value) before sending, to compensate
+     * for a confirmed hardware/firmware quirk on the current test rig
+     * (WeMos D1 Mini32, GPIO4 test LED): requesting a raw duty of 255
+     * visually produced OFF and 0 produced FULL BRIGHT, confirmed by
+     * both direct visual LED observation and multimeter voltage
+     * magnitude readings. This is centralized here (rather than at
+     * each call site) so every caller — the Controls slider, gamepad
+     * axis mapping, anything added later — automatically gets correct
+     * behavior without needing to know about or duplicate this
+     * compensation.
+     *
+     * If this ever needs to differ per-board or per-pin (e.g. a
+     * different board that isn't inverted), this is the one place
+     * that would need to become conditional — see PIN_MAPPER_ROADMAP.md.
+     */
     fun sendSetValue(role: String, value: Int, onResult: (String?) -> Unit) {
-        sendRaw("SETV $role $value\n", onResult)
+        val wireValue = (255 - value).coerceIn(0, 255)
+        sendRaw("SETV $role $wireValue\n", onResult)
     }
 
     /**

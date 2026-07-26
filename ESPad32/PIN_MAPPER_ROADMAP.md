@@ -283,10 +283,34 @@ your device, then connect to it."
       **Also noted:** a gamepad button mapped to a PWM/slider function
       logs a clear "can't drive it yet" message instead of doing
       something wrong — driving a continuous value needs axis mapping
-      (a stick), not a button, and that's still unbuilt.
+      (a stick), not a button. **Axis mapping is now built — see below.**
       SERVO roles still aren't offered anywhere — firmware has no angle
       command yet (`SETV` is PWM duty only, confirmed via multimeter
       testing on the D1 Mini32 test rig).
+- [x] **Confirmed and fixed PWM inversion, centralized the fix.** Direct
+      visual LED testing (not just multimeter readings, which had their
+      own probe-placement confusion along the way) confirmed requesting
+      a high value produced OFF and a low value produced FULL BRIGHT —
+      genuinely backwards from user expectation. Fixed by inverting the
+      wire value inside `DeviceCommand.sendSetValue()` itself (255 -
+      value) rather than at each call site, so every current and future
+      caller (the Controls slider, gamepad axis mapping below) gets
+      correct behavior automatically. If a future board/pin turns out
+      NOT to need this compensation, this is the one place that would
+      need to become conditional.
+- [x] **Gamepad axis mapped to a custom PWM slider.** Mirrors the
+      CUSTOM_CONTROL button pattern: new `AxisFunction.CUSTOM_PWM`,
+      `AxisMapping.customButtonId` referencing a SLIDER-type Controls
+      button, a secondary "which slider?" picker in Controller Mapping
+      settings when CUSTOM_PWM is selected. Only `axisX` is used (single
+      continuous input, e.g. a trigger or one stick axis) — `axisY` is
+      ignored for this function. Rate-limited to the same 80ms interval
+      already used for camera pan/tilt, and only sends when the
+      normalized value actually changes (not every identical repeat
+      event). **Known rough edge:** the -1..1-to-0..255 normalization
+      assumes a stick-style axis range; a trigger axis (typically 0..1)
+      will only span the upper half of the output range until tested
+      and adjusted for real trigger hardware.
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI

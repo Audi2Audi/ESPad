@@ -231,10 +231,20 @@ class ControllerMappingActivity : AppCompatActivity() {
         ControllerMapping.axes.forEachIndexed { index, mapping ->
             val row = layoutInflater.inflate(R.layout.item_button_row, contentArea, false)
             row.findViewById<TextView>(R.id.tvButtonName).text = mapping.label
-            row.findViewById<TextView>(R.id.tvButtonFunction).text = mapping.function.label
+            row.findViewById<TextView>(R.id.tvButtonFunction).text = displayLabelForAxis(mapping)
             row.setOnClickListener { showAxisEditDialog(index, mapping) }
             contentArea.addView(row)
         }
+    }
+
+    private fun displayLabelForAxis(mapping: AxisMapping): String {
+        if (mapping.function != AxisFunction.CUSTOM_PWM) return mapping.function.label
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val buttons = com.espad32.controller.controls.ControlButtonStorage(this).loadButtons(profileKey)
+        val target = buttons.find { it.id == mapping.customButtonId }
+        return if (target != null) "→ ${target.label}" else "Custom PWM Function (none set)"
     }
 
     private fun showAxisEditDialog(index: Int, mapping: AxisMapping) {
@@ -252,7 +262,43 @@ class ControllerMappingActivity : AppCompatActivity() {
             .setTitle("Axis: ${mapping.label}")
             .setView(spinner)
             .setPositiveButton("Save") { _, _ ->
-                ControllerMapping.updateAxis(index, functions[spinner.selectedItemPosition], this)
+                val selected = functions[spinner.selectedItemPosition]
+                if (selected == AxisFunction.CUSTOM_PWM) {
+                    showCustomPwmPicker(index, mapping)
+                } else {
+                    ControllerMapping.updateAxis(index, selected, this)
+                    showTab(2)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // Second step when "Custom PWM Function" is chosen — pick WHICH
+    // slider (a SLIDER-type Controls button, e.g. "Motor speed") this
+    // axis should drive.
+    private fun showCustomPwmPicker(index: Int, mapping: AxisMapping) {
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val buttons = com.espad32.controller.controls.ControlButtonStorage(this)
+            .loadButtons(profileKey)
+            .filter { it.controlType == com.espad32.controller.controls.ControlType.SLIDER }
+
+        if (buttons.isEmpty()) {
+            android.widget.Toast.makeText(
+                this,
+                "No PWM sliders exist yet for the active profile — add a PWM function's button in Controls first.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val labels = buttons.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Which slider?")
+            .setItems(labels) { _, itemIndex ->
+                ControllerMapping.updateAxis(index, AxisFunction.CUSTOM_PWM, this, buttons[itemIndex].id)
                 showTab(2)
             }
             .setNegativeButton("Cancel", null)

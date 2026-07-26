@@ -69,6 +69,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var servo2Angle = 90.0f
     private var lastServoSendTime = 0L
     private val SERVO_SEND_INTERVAL_MS = 80L
+    private var lastCustomPwmSendTime = 0L
+    private var lastCustomPwmSentValue = -1
 
     // ── Sensitivity (loaded from prefs) ───────────────────────────────
     private var g8ServoStep  = 8.0f
@@ -519,6 +521,24 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                         }
                     }
                     AxisFunction.NONE -> {}
+                    AxisFunction.CUSTOM_PWM -> {
+                        // Single-axis only (axisY ignored). Raw axis
+                        // values are typically -1..1 for sticks or 0..1
+                        // for triggers — this maps the -1..1 case
+                        // correctly to 0-255; a trigger-only axis will
+                        // only span the upper half of that range, which
+                        // is a known rough edge worth revisiting once a
+                        // real trigger axis is tested (see
+                        // PIN_MAPPER_ROADMAP.md).
+                        val normalized = ((rawX + 1f) / 2f * 255f).toInt().coerceIn(0, 255)
+                        val now = System.currentTimeMillis()
+                        if (normalized != lastCustomPwmSentValue &&
+                            (now - lastCustomPwmSendTime) >= SERVO_SEND_INTERVAL_MS) {
+                            lastCustomPwmSendTime = now
+                            lastCustomPwmSentValue = normalized
+                            executeCustomPwmAxis(mapping.customButtonId, normalized)
+                        }
+                    }
                 }
             }
             return true
@@ -608,8 +628,31 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 // work (see PIN_MAPPER_ROADMAP.md). A gamepad button
                 // mapped to a PWM/slider function has nothing sensible
                 // to do here yet.
-                CarLogger.log("Controls", "\"${btn.label}\" is a slider — gamepad buttons can't drive it yet, only axes can (not built).")
+                CarLogger.log("Controls", "\"${btn.label}\" is a slider — map it to a gamepad AXIS instead of a button (Controller Mapping settings).")
             }
+        }
+    }
+
+    // Drives a user-defined Controls slider (a PWM_OUTPUT role) from a
+    // mapped gamepad axis — same DeviceCommand.sendSetValue path the
+    // on-screen slider itself uses (including the centralized PWM
+    // inversion compensation), so behavior is identical either way.
+    private fun executeCustomPwmAxis(buttonId: String?, value: Int) {
+        if (buttonId == null) {
+            CarLogger.log("Controls", "Gamepad axis has no PWM slider assigned yet.")
+            return
+        }
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val btn = controlButtonStorage.loadButtons(profileKey).find { it.id == buttonId }
+        if (btn == null) {
+            CarLogger.log("Controls", "Assigned PWM slider no longer exists (was it deleted?).")
+            return
+        }
+        controlButtonStorage.setValue(profileKey, btn.id, value)
+        com.espad32.controller.controls.DeviceCommand.sendSetValue(btn.roleKey, value) { response ->
+            CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
         }
     }
 

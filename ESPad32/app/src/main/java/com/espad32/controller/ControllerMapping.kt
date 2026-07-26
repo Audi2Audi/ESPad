@@ -37,7 +37,12 @@ enum class AxisFunction(val label: String) {
     DRIVE("Drive (throttle + steer)"),
     TRIGGER_DRIVE("Trigger Drive (fwd/rev)"),
     STEER_ONLY("Steer Only (left/right)"),
-    PAN_TILT("Camera Pan/Tilt")
+    PAN_TILT("Camera Pan/Tilt"),
+    // Drives one of the user-defined Controls sliders (a PWM_OUTPUT
+    // role, e.g. "Motor speed") using a single axis — see
+    // AxisMapping.customButtonId. Only axisX is used; axisY is ignored
+    // for this function.
+    CUSTOM_PWM("Custom PWM Function")
 }
 
 // ── A single button mapping ───────────────────────────────────────────
@@ -57,7 +62,10 @@ data class AxisMapping(
     val label: String,
     val function: AxisFunction,
     val invertX: Boolean = false,
-    val invertY: Boolean = false
+    val invertY: Boolean = false,
+    // Only used when function == CUSTOM_PWM — the id of a
+    // ControlButtonDef (a SLIDER-type Controls button) this axis drives.
+    val customButtonId: String? = null
 )
 
 // ── Preset profiles ───────────────────────────────────────────────────
@@ -215,8 +223,8 @@ object ControllerMapping {
         saveToPrefs(context)
     }
 
-    fun updateAxis(index: Int, function: AxisFunction, context: Context) {
-        _axes[index] = _axes[index].copy(function = function)
+    fun updateAxis(index: Int, function: AxisFunction, context: Context, customButtonId: String? = null) {
+        _axes[index] = _axes[index].copy(function = function, customButtonId = customButtonId)
         saveToPrefs(context)
     }
 
