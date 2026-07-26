@@ -63,6 +63,13 @@
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="---.---.---.---"
             android:textColor="#00E5FF" android:textSize="12sp" android:fontFamily="monospace"/>
+        <Button android:id="@+id/btnSearchDevicesTop"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🔍" android:textSize="13sp"
+            android:background="@android:color/transparent"
+            android:minWidth="0dp" android:minHeight="0dp"
+            android:padding="4dp"
+            android:layout_marginEnd="8dp"/>
         <TextView android:id="@+id/tvStatus"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="Disconnected"

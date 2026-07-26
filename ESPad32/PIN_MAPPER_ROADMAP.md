@@ -27,6 +27,11 @@ from when picking the next increment.
         show a picker. Still requires tapping Save to actually connect,
         matching the existing pattern for auto-populated IPs elsewhere
         in that screen.
+      - Also added directly on the **main driving screen**, next to
+        the live IP display in the top status bar — since there's no
+        "Save" step there, a found device is applied and reconnected
+        to immediately (or a picker shown for multiple results),
+        rather than just filling a field for later confirmation.
       - Not yet done: only the test sketch speaks this protocol. The
         real car firmware (separate ESPad32 repo) doesn't implement
         `discovery.h`'s UDP responder — this needs porting over there

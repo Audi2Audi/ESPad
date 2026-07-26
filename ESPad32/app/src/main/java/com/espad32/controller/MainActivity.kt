@@ -126,6 +126,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         tvStatus         = findViewById(R.id.tvStatus)
         tvBattery        = findViewById(R.id.tvBattery)
         tvIp             = findViewById(R.id.tvIp)
+        findViewById<android.widget.Button>(R.id.btnSearchDevicesTop).setOnClickListener {
+            searchForDevicesFromMain()
+        }
         tvRecording      = findViewById(R.id.tvRecording)
         controlPanelView = findViewById(R.id.controlPanel)
         joystickLeft     = findViewById(R.id.joystickLeft)
@@ -271,6 +274,45 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     // ── Connection ────────────────────────────────────────────────────
+    // Solves the case where a device's STA IP wasn't received via the
+    // normal TCP response (AP->STA channel switch can drop the
+    // connection right as the response is sent). Unlike Settings'
+    // version of this (which just fills the IP field for the user to
+    // review and Save), this applies directly and reconnects — there's
+    // no separate "Save" step on the main screen.
+    private fun searchForDevicesFromMain() {
+        CarLogger.log("Main", "Searching for devices...")
+        com.espad32.controller.controls.DeviceDiscovery.discover { found ->
+            when {
+                found.isEmpty() -> {
+                    android.widget.Toast.makeText(this, "No devices found.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                found.size == 1 -> applyDiscoveredIp(found[0].ip, found[0].name)
+                else -> {
+                    val labels = found.map { "${it.name} (${it.ip})" }.toTypedArray()
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Select a device")
+                        .setItems(labels) { _, index -> applyDiscoveredIp(found[index].ip, found[index].name) }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+            }
+        }
+    }
+
+    private fun applyDiscoveredIp(ip: String, name: String) {
+        if (ip == carIp) {
+            android.widget.Toast.makeText(this, "Already connected to $ip", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        carIp = ip
+        tvIp.text = carIp
+        getSharedPreferences("ESPad32Prefs", MODE_PRIVATE).edit().putString("ip", carIp).apply()
+        CarLogger.log("Main", "Found \"$name\" at $ip — reconnecting")
+        findViewById<android.view.View>(R.id.cameraPlaceholder)?.visibility = android.view.View.VISIBLE
+        connectToCar()
+    }
+
     private fun connectToCar() {
         updateStatus("Connecting…")
         tcpClient?.disconnect()
