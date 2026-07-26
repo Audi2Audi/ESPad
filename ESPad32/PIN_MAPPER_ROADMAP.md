@@ -7,6 +7,15 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] **Fixed:** reassigning a GPIO away from a required built-in role
+      (e.g. stealing GPIO 4 from "Motor standby" to give it to a new
+      custom "LED" function) silently left the built-in role unassigned,
+      and `Validate & Save` correctly refused to save — but without
+      making that consequence obvious, so it just looked like the
+      reassignment "didn't take." Now `onPinTapped` logs explicitly
+      when bumping another role, and calls out clearly when the bumped
+      role is a required built-in one that needs a new pin before
+      saving will succeed.
 - [x] Removed Freenove-firmware-specific panel buttons (LED, LED Off,
       Face, Face Off, Horn, Servo Reset, Custom Face/Matrix Canvas) —
       these sent `CMD_LED_MOD`/`CMD_MATRIX_MOD`/`CMD_BUZZER`/`CMD_CAMERA`

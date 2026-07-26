@@ -267,9 +267,18 @@ class PinMapperActivity : AppCompatActivity() {
             return
         }
 
-        // Clear any other role currently holding this GPIO.
-        assignments.entries.find { it.value == gpio && it.key != roleKey }?.let {
-            assignments[it.key] = null
+        // Clear any other role currently holding this GPIO — and say so
+        // clearly, since bumping a required built-in role will block
+        // Validate & Save until it's reassigned somewhere else.
+        assignments.entries.find { it.value == gpio && it.key != roleKey }?.let { bumped ->
+            assignments[bumped.key] = null
+            val bumpedLabel = effectiveRoles().find { it.key == bumped.key }?.label ?: bumped.key
+            val isCustom = customRoles.any { it.key == bumped.key }
+            if (isCustom) {
+                log("\"$bumpedLabel\" is now unassigned.")
+            } else {
+                log("\"$bumpedLabel\" is now unassigned — it's required, so you'll need to give it a new pin before you can Validate & Save.")
+            }
         }
         assignments[roleKey] = gpio
 
