@@ -148,6 +148,18 @@ your device, then connect to it."
       a time (reusing the custom-role creation flow already built) →
       assign pins → save as its own profile, stored alongside (not
       replacing) the built-in Train/RC Car ones
+      **Note:** different profiles will genuinely use different board
+      types, not just different pin assignments on the same board —
+      e.g. train on a D1 Mini32, a future robot arm on an ESP32-WROVER.
+      Already fine structurally (`DeviceProfile.boardKey` is already
+      per-profile, not global), but the "New Device" flow needs to make
+      board choice a real, deliberate step every time — never default
+      to "whichever board is first in the list." Also means `Boards.ALL`
+      needs to keep growing to cover whatever hardware people actually
+      build on — **ESP32-WROVER** (extra PSRAM, larger form factor,
+      common for camera/robotics projects) is a concrete candidate given
+      the robot arm mention, not yet added (only D1 Mini32 and ESP32
+      DevKit V1 exist today).
 - [ ] A **settings entry point** that walks through board → pins →
       functions → buttons as one guided sequence, instead of requiring
       someone to already know to visit Pin Mapper then Controls
