@@ -151,6 +151,20 @@ chain (saved role → resolved GPIO → real hardware output) works
 correctly — the prerequisite before wiring the same command up over
 TCP instead of Serial.
 
+**Future settings feature (not built yet):** the test sketch currently
+hardcodes a fixed AP SSID/password ("ESPad_Test" / "espad1234"). Once
+someone has more than one ESP32 device (train, RC car, future builds),
+identical default credentials across all of them will collide/confuse
+which network you're actually connecting to. The app's Settings screen
+should let the user view/edit the SSID and password **for the specific
+device they're configuring** — meaning this also needs a way to push
+that changed SSID/password to the firmware itself (e.g. a command like
+`SET_WIFI <ssid> <password>` that writes new AP credentials to NVS and
+reboots), not just store it app-side. Worth scoping alongside the rest
+of the live-transport work rather than bolting on later, since it
+touches both the connection-settings UI and the firmware's WiFi setup
+code.
+
 ## Bigger lift: firmware-side generality
 
 This is the harder half, and probably the long pole for "control any
