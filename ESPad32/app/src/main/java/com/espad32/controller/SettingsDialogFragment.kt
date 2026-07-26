@@ -1,11 +1,13 @@
 package com.espad32.controller
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
+import com.espad32.controller.controls.DeviceDiscovery
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -105,6 +107,10 @@ class SettingsDialogFragment : DialogFragment() {
             MainTcpHolder.enqueue?.invoke("CMD_CAR_MODE#2\n")
         }
 
+        view.findViewById<Button>(R.id.btnSearchDevices)?.setOnClickListener {
+            searchForDevices()
+        }
+
         fun doSave() {
             val theme = when (rgTheme?.checkedRadioButtonId) {
                 R.id.rbMinimal -> PanelTheme.MINIMAL_FLAT
@@ -143,6 +149,39 @@ class SettingsDialogFragment : DialogFragment() {
             1 -> buildThemeTab()
             2 -> buildControllerTab()
             3 -> buildAdvancedTab()
+        }
+    }
+
+    // ── Device search (UDP broadcast discovery) ────────────────────────
+    // Solves the case where a device's STA IP wasn't received via the
+    // normal TCP response after connecting to a router — instead of
+    // needing to log into the router to find it, ask the device
+    // directly over the network. See DeviceDiscovery.kt for details.
+    private fun searchForDevices() {
+        toast("Searching for devices...")
+        DeviceDiscovery.discover { found ->
+            if (!isAdded) return@discover // fragment may have closed mid-search
+
+            when {
+                found.isEmpty() -> {
+                    toast("No devices found. Make sure it's powered on and on the same network.")
+                }
+                found.size == 1 -> {
+                    etIp?.setText(found[0].ip)
+                    toast("Found \"${found[0].name}\" at ${found[0].ip} — tap Save to connect.")
+                }
+                else -> {
+                    val labels = found.map { "${it.name} (${it.ip})" }.toTypedArray()
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("Select a device")
+                        .setItems(labels) { _, index ->
+                            etIp?.setText(found[index].ip)
+                            toast("Selected ${found[index].ip} — tap Save to connect.")
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+            }
         }
     }
 

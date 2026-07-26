@@ -7,6 +7,31 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] **UDP broadcast device discovery** — solves "the STA IP wasn't
+      reported in time during the AP->STA channel switch" (the ESP32
+      has one radio, so AP+STA share a channel; when STA connects to a
+      router the AP's channel often has to shift to match, which can
+      drop the connection right as the CMD_WIFI_OK response with the
+      new IP is being sent). Instead of needing to log into the router
+      to find the device, the app broadcasts "ESPAD_DISCOVER" and any
+      ESPad device replies directly with "ESPAD_HERE#<ip>#<name>".
+      - Firmware: `discovery.h` (test sketch v6) — a UDP listener on
+        port 4210, replies with the STA IP if connected, AP IP as
+        fallback. `<name>` is currently just the AP SSID; once devices
+        have real user-given names (see the device-profile work below),
+        this should report that instead.
+      - App: `controls/DeviceDiscovery.kt` broadcasts and collects
+        replies for ~2s on a background thread. Wired into
+        `SettingsDialogFragment` via a new 🔍 button next to the IP
+        field — one result auto-fills the IP field, multiple results
+        show a picker. Still requires tapping Save to actually connect,
+        matching the existing pattern for auto-populated IPs elsewhere
+        in that screen.
+      - Not yet done: only the test sketch speaks this protocol. The
+        real car firmware (separate ESPad32 repo) doesn't implement
+        `discovery.h`'s UDP responder — this needs porting over there
+        too before it helps with the actual car, not just test builds.
+
 - [x] **Fixed:** reassigning a GPIO away from a required built-in role
       (e.g. stealing GPIO 4 from "Motor standby" to give it to a new
       custom "LED" function) silently left the built-in role unassigned,

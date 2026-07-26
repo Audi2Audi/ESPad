@@ -20,7 +20,17 @@
             android:textColor="#FFFFFF" android:textColorHint="#555555"
             android:hint="192.168.4.1" android:background="#2A2A2A"
             android:paddingStart="8dp" android:paddingEnd="8dp"
-            android:layout_marginEnd="16dp"/>
+            android:layout_marginEnd="8dp"/>
+
+        <!-- Search for devices on the network — solves the "STA IP
+             wasn't reported in time during the AP->STA channel switch"
+             problem by asking the device directly via UDP broadcast
+             instead of relying on the earlier TCP response. -->
+        <Button android:id="@+id/btnSearchDevices"
+            android:layout_width="wrap_content" android:layout_height="36dp"
+            android:text="🔍" android:textSize="14sp"
+            android:layout_marginEnd="16dp"
+            style="@style/CarButton"/>
 
         <!-- Joystick toggle moved right, next to Follow -->
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
