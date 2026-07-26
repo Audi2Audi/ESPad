@@ -16,6 +16,7 @@ import com.espad32.controller.pinmapper.RoleType
 import com.espad32.controller.pinmapper.DeviceProfile
 import com.espad32.controller.pinmapper.CustomRoleStorage
 import com.espad32.controller.pinmapper.RoleResolver
+import com.espad32.controller.pinmapper.ProfileResolver
 
 class ControlsActivity : AppCompatActivity() {
 
@@ -52,9 +53,9 @@ class ControlsActivity : AppCompatActivity() {
 
     private fun buildProfileTabs() {
         profileTabContainer.removeAllViews()
-        Profiles.ALL.forEach { profile ->
+        ProfileResolver.allProfiles(this).forEach { profile ->
             val tab = Button(this).apply {
-                text = if (profile.key == "train") "Train" else "RC Car"
+                text = profile.displayName
                 textSize = 12.5f
                 isAllCaps = false
                 setBackgroundColor(

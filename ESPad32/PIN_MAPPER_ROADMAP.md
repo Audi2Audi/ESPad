@@ -311,6 +311,37 @@ your device, then connect to it."
       assumes a stick-style axis range; a trigger axis (typically 0..1)
       will only span the upper half of the output range until tested
       and adjusted for real trigger hardware.
+- [x] **"New Device" flow — first version.** Solves the original
+      motivating problem directly: previously a lamp had to live inside
+      Train's skeleton (four required motor/audio roles it didn't need)
+      because `DeviceProfile` was only ever `Profiles.TRAIN`/`RC_CAR`,
+      two compile-time constants. Now Pin Mapper has a "+" tab that
+      opens a name + board picker, creating a real user profile with
+      **zero built-in roles** — nothing mandatory, nothing to fill in
+      before Validate & Save will work.
+      This turned out to be mostly plumbing, not a rewrite: pin
+      assignments (`PinConfigStorage`), custom functions
+      (`CustomRoleStorage`), buttons (`ControlButtonStorage`), and
+      gamepad mappings are all already keyed generically by profile
+      string — a user-created profile "just works" with all of them
+      the moment it exists. The only genuinely new pieces were
+      `CustomProfileStorage` (persists name/board per user profile),
+      `ProfileResolver` (merges built-in + custom for anywhere that
+      just reads the list), and making the profile-tab UI in both Pin
+      Mapper and Controls dynamic instead of two hardcoded tabs.
+      **What's still missing from the fuller vision:**
+      - No settings-screen entry point yet — creation only happens via
+        Pin Mapper's "+" tab, not a guided board→pins→functions→buttons
+        walkthrough in one place.
+      - Deleting a device profile removes the profile entry itself, but
+        NOT its stored functions/pin assignments/buttons — those remain
+        under the same key and would reappear if a profile with the
+        same generated key were created again. Not dangerous, just
+        untidy; worth cleaning up properly later.
+      - Still per-session-switch only (as clarified earlier) — no live
+        device-to-device switching, and no per-profile connection info
+        (SSID/IP) yet, so switching to a different device profile
+        doesn't automatically point the app at that device's network.
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI

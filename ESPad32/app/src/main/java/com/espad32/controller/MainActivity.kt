@@ -760,7 +760,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val container = controlPanelView.getDynamicButtonsContainer()
         container.removeAllViews()
         val profileKey = ActiveProfile.get(this, Profiles.TRAIN.key)
-        val profile = Profiles.ALL.find { it.key == profileKey } ?: Profiles.TRAIN
+        val profile = com.espad32.controller.pinmapper.ProfileResolver.allProfiles(this)
+            .find { it.key == profileKey } ?: Profiles.TRAIN
         // SLIDER controls (PWM roles) aren't rendered here — the compact
         // pill-button panel has no slider widget yet. They're fully
         // usable from the Controls screen; this is a scoped decision,

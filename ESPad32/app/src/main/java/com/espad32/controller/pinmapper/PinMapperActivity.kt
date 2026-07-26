@@ -16,6 +16,7 @@ class PinMapperActivity : AppCompatActivity() {
 
     private lateinit var storage: PinConfigStorage
     private lateinit var customRoleStorage: CustomRoleStorage
+    private lateinit var customProfileStorage: CustomProfileStorage
     private var currentProfile: DeviceProfile = Profiles.TRAIN
     private var currentBoardKey: String = Profiles.TRAIN.boardKey
     private var assignments: MutableMap<String, Int?> = mutableMapOf()
@@ -38,6 +39,7 @@ class PinMapperActivity : AppCompatActivity() {
 
         storage = PinConfigStorage(this)
         customRoleStorage = CustomRoleStorage(this)
+        customProfileStorage = CustomProfileStorage(this)
 
         profileTabContainer = findViewById(R.id.profileTabContainer)
         boardTabContainer = findViewById(R.id.boardTabContainer)
@@ -57,9 +59,9 @@ class PinMapperActivity : AppCompatActivity() {
 
     private fun buildProfileTabs() {
         profileTabContainer.removeAllViews()
-        Profiles.ALL.forEach { profile ->
+        ProfileResolver.allProfiles(this).forEach { profile ->
             val tab = Button(this).apply {
-                text = if (profile.key == "train") "Train" else "RC Car"
+                text = profile.displayName
                 textSize = 12.5f
                 isAllCaps = false
                 setBackgroundColor(
@@ -71,10 +73,87 @@ class PinMapperActivity : AppCompatActivity() {
                     else Color.parseColor("#8A939C")
                 )
                 setOnClickListener { loadProfile(profile) }
+                setOnLongClickListener {
+                    // Built-in profiles (Train/RC Car) can't be deleted —
+                    // only user-created ones.
+                    if (customProfileStorage.loadProfiles().any { it.key == profile.key }) {
+                        showDeleteDeviceDialog(profile)
+                    }
+                    true
+                }
             }
             val params = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             profileTabContainer.addView(tab, params)
         }
+
+        val addTab = Button(this).apply {
+            text = "+"
+            textSize = 14f
+            isAllCaps = false
+            setBackgroundColor(Color.TRANSPARENT)
+            setTextColor(Color.parseColor("#E3A458"))
+            setOnClickListener { showAddDeviceDialog() }
+        }
+        profileTabContainer.addView(
+            addTab,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        )
+    }
+
+    // Creates a brand-new device profile with NO built-in roles at all —
+    // unlike Train/RC Car, someone building a simple lamp isn't forced
+    // into a skeleton meant for a completely different kind of device.
+    private fun showAddDeviceDialog() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 0)
+        }
+        val nameInput = EditText(this).apply { hint = "Device name (e.g. Lamp)" }
+        container.addView(nameInput)
+
+        container.addView(TextView(this).apply {
+            text = "Board"
+            setPadding(0, 24, 0, 4)
+        })
+        var selectedBoardKey = Boards.ALL.first().key
+        val boardRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        Boards.ALL.forEach { board ->
+            val boardBtn = Button(this).apply {
+                text = board.displayName
+                textSize = 11f
+                isAllCaps = false
+                setOnClickListener { selectedBoardKey = board.key }
+            }
+            boardRow.addView(boardBtn)
+        }
+        container.addView(boardRow)
+
+        AlertDialog.Builder(this)
+            .setTitle("New Device")
+            .setView(container)
+            .setPositiveButton("Create") { _, _ ->
+                val name = nameInput.text.toString().ifBlank { "New Device" }
+                val created = customProfileStorage.addProfile(name, selectedBoardKey)
+                log("Created device \"$name\".")
+                loadProfile(
+                    DeviceProfile(created.key, created.displayName, created.boardKey, emptyList(), emptyMap())
+                )
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showDeleteDeviceDialog(profile: DeviceProfile) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete \"${profile.displayName}\"?")
+            .setMessage("This removes the device profile itself. Its functions, pin assignments, and buttons stay stored under this profile's key and would reappear if a profile with the same name were created again — they aren't separately cleaned up yet.")
+            .setPositiveButton("Delete") { _, _ ->
+                customProfileStorage.deleteProfile(profile.key)
+                log("Deleted device \"${profile.displayName}\".")
+                loadProfile(Profiles.TRAIN)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun loadProfile(profile: DeviceProfile) {
