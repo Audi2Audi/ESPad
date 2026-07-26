@@ -231,7 +231,7 @@ class ControllerMappingActivity : AppCompatActivity() {
         ControllerMapping.axes.forEachIndexed { index, mapping ->
             val row = layoutInflater.inflate(R.layout.item_button_row, contentArea, false)
             row.findViewById<TextView>(R.id.tvButtonName).text = mapping.label
-            row.findViewById<TextView>(R.id.tvButtonFunction).text = displayLabelFor(mapping)
+            row.findViewById<TextView>(R.id.tvButtonFunction).text = mapping.function.label
             row.setOnClickListener { showAxisEditDialog(index, mapping) }
             contentArea.addView(row)
         }
