@@ -96,10 +96,20 @@ class ControllerMappingActivity : AppCompatActivity() {
         ControllerMapping.buttons.forEachIndexed { index, mapping ->
             val row = layoutInflater.inflate(R.layout.item_button_row, contentArea, false)
             row.findViewById<TextView>(R.id.tvButtonName).text = mapping.label
-            row.findViewById<TextView>(R.id.tvButtonFunction).text = mapping.function.label
+            row.findViewById<TextView>(R.id.tvButtonFunction).text = displayLabelFor(mapping)
             row.setOnClickListener { showButtonEditDialog(index, mapping) }
             contentArea.addView(row)
         }
+    }
+
+    private fun displayLabelFor(mapping: ButtonMapping): String {
+        if (mapping.function != ButtonFunction.CUSTOM_CONTROL) return mapping.function.label
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val buttons = com.espad32.controller.controls.ControlButtonStorage(this).loadButtons(profileKey)
+        val target = buttons.find { it.id == mapping.customButtonId }
+        return if (target != null) "→ ${target.label}" else "Custom Control Button (none set)"
     }
 
     private fun showButtonEditDialog(index: Int, mapping: ButtonMapping) {
@@ -137,11 +147,40 @@ class ControllerMappingActivity : AppCompatActivity() {
             .setView(view)
             .setPositiveButton("Save") { _, _ ->
                 val selected = functions[spinner.selectedItemPosition]
-                android.util.Log.d("ESPad32", "Saving button[$index] ${mapping.label} -> ${selected.label}")
-                android.util.Log.d("ESPad32", "Before: ${ControllerMapping.buttons[index].function.label}")
-                ControllerMapping.updateButton(index, selected, this)
-                android.util.Log.d("ESPad32", "After: ${ControllerMapping.buttons[index].function.label}")
-                android.util.Log.d("ESPad32", "functionForKey(${mapping.keyCode}): ${ControllerMapping.functionForKey(mapping.keyCode).label}")
+                if (selected == ButtonFunction.CUSTOM_CONTROL) {
+                    showCustomControlPicker(index, mapping)
+                } else {
+                    ControllerMapping.updateButton(index, selected, this)
+                    showTab(1)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // Second step when "Custom Control Button" is chosen — pick WHICH
+    // of the currently-defined Controls buttons (e.g. "LED") this
+    // gamepad button should trigger.
+    private fun showCustomControlPicker(index: Int, mapping: ButtonMapping) {
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val buttons = com.espad32.controller.controls.ControlButtonStorage(this).loadButtons(profileKey)
+
+        if (buttons.isEmpty()) {
+            android.widget.Toast.makeText(
+                this,
+                "No Controls buttons exist yet for the active profile — add one in the Controls screen first.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val labels = buttons.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Which button?")
+            .setItems(labels) { _, itemIndex ->
+                ControllerMapping.updateButton(index, ButtonFunction.CUSTOM_CONTROL, this, buttons[itemIndex].id)
                 showTab(1)
             }
             .setNegativeButton("Cancel", null)
@@ -192,7 +231,7 @@ class ControllerMappingActivity : AppCompatActivity() {
         ControllerMapping.axes.forEachIndexed { index, mapping ->
             val row = layoutInflater.inflate(R.layout.item_button_row, contentArea, false)
             row.findViewById<TextView>(R.id.tvButtonName).text = mapping.label
-            row.findViewById<TextView>(R.id.tvButtonFunction).text = mapping.function.label
+            row.findViewById<TextView>(R.id.tvButtonFunction).text = displayLabelFor(mapping)
             row.setOnClickListener { showAxisEditDialog(index, mapping) }
             contentArea.addView(row)
         }

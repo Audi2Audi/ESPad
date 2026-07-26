@@ -529,7 +529,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (event.repeatCount > 0) return super.onKeyDown(keyCode, event)
         if (!isGamepad(event)) return super.onKeyDown(keyCode, event)
-        executeButtonFunction(ControllerMapping.functionForKey(keyCode), true)
+        executeButtonFunction(keyCode, true)
         return true
     }
 
@@ -540,7 +540,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         return true
     }
 
-    private fun executeButtonFunction(fn: ButtonFunction, isPress: Boolean) {
+    private fun executeButtonFunction(keyCode: Int, isPress: Boolean) {
+        val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
+        val fn = mapping?.function ?: ButtonFunction.NONE
         when (fn) {
             ButtonFunction.HORN_ON      -> enqueue("CMD_BUZZER#1#2000\n")
             ButtonFunction.PHOTO        -> takePhoto()
@@ -560,7 +562,46 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             ButtonFunction.LIGHT_FOLLOW -> enqueue("CMD_CAR_MODE#1\n")
             ButtonFunction.LINE_TRACK   -> enqueue("CMD_CAR_MODE#2\n")
             ButtonFunction.STOP         -> enqueue("CMD_MOTOR#0#0#0#0\n")
+            ButtonFunction.CUSTOM_CONTROL -> executeCustomControlButton(mapping?.customButtonId)
             ButtonFunction.NONE         -> {}
+        }
+    }
+
+    // Triggers a user-defined Controls button (e.g. "LED") from a
+    // mapped gamepad press — same DeviceCommand.sendSet path the
+    // on-screen Controls button itself uses, so behavior (and the
+    // device log) is identical whether it's tapped on screen or fired
+    // from the gamepad.
+    private fun executeCustomControlButton(buttonId: String?) {
+        if (buttonId == null) {
+            CarLogger.log("Controls", "Gamepad button has no Control button assigned yet.")
+            return
+        }
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val btn = controlButtonStorage.loadButtons(profileKey).find { it.id == buttonId }
+        if (btn == null) {
+            CarLogger.log("Controls", "Assigned Control button no longer exists (was it deleted?).")
+            return
+        }
+
+        when (btn.controlType) {
+            com.espad32.controller.controls.ControlType.TOGGLE -> {
+                val newState = !controlButtonStorage.getState(profileKey, btn.id)
+                controlButtonStorage.setState(profileKey, btn.id, newState)
+                CarLogger.log("Controls", "[Gamepad] \"${btn.label}\" -> ${if (newState) "ON" else "OFF"} — sending...")
+                com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, newState) { response ->
+                    CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+                    renderLiveButtons()
+                }
+            }
+            com.espad32.controller.controls.ControlType.MOMENTARY -> {
+                CarLogger.log("Controls", "[Gamepad] \"${btn.label}\" pressed — sending...")
+                com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, true) { response ->
+                    CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+                }
+            }
         }
     }
 

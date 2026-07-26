@@ -238,6 +238,16 @@ your device, then connect to it."
       PWM/servo slider equivalent that's already flagged as unbuilt
       above, so gamepad-axis-to-custom-function mapping naturally
       follows behind that, not before it.
+- [x] **Gamepad buttons mapped to user-defined functions** — added
+      `ButtonFunction.CUSTOM_CONTROL`, which targets one of the
+      currently-defined Controls buttons (by id) instead of a fixed car
+      command. `ControllerMappingActivity` shows a secondary picker
+      ("which button?") when this function is selected, listing the
+      active profile's Controls buttons by label. Firing it calls the
+      exact same `DeviceCommand.sendSet()` path the on-screen tap uses,
+      so behavior (and the device log) is identical either way.
+      **Axes/sticks still not done** — this covers buttons only, per
+      the split noted above.
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI

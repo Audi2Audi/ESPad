@@ -26,7 +26,10 @@ enum class ButtonFunction(val label: String) {
     TILT_CENTER("Tilt Center (90°)"),
     LIGHT_FOLLOW("Light Follow Mode"),
     LINE_TRACK("Line Track Mode"),
-    STOP("Stop Car")
+    STOP("Stop Car"),
+    // Triggers one of the user-defined Controls buttons (e.g. "LED")
+    // instead of a fixed car command — see ButtonMapping.customButtonId.
+    CUSTOM_CONTROL("Custom Control Button")
 }
 
 enum class AxisFunction(val label: String) {
@@ -41,7 +44,10 @@ enum class AxisFunction(val label: String) {
 data class ButtonMapping(
     val keyCode: Int,
     val label: String,          // friendly name e.g. "A Button"
-    val function: ButtonFunction
+    val function: ButtonFunction,
+    // Only used when function == CUSTOM_CONTROL — the id of a
+    // ControlButtonDef (from the Controls screen) this button triggers.
+    val customButtonId: String? = null
 )
 
 // ── A single axis mapping ─────────────────────────────────────────────
@@ -204,8 +210,8 @@ object ControllerMapping {
         if (save) saveToPrefs(null)
     }
 
-    fun updateButton(index: Int, function: ButtonFunction, context: Context) {
-        _buttons[index] = _buttons[index].copy(function = function)
+    fun updateButton(index: Int, function: ButtonFunction, context: Context, customButtonId: String? = null) {
+        _buttons[index] = _buttons[index].copy(function = function, customButtonId = customButtonId)
         saveToPrefs(context)
     }
 
