@@ -342,6 +342,33 @@ your device, then connect to it."
         device-to-device switching, and no per-profile connection info
         (SSID/IP) yet, so switching to a different device profile
         doesn't automatically point the app at that device's network.
+- [x] **Train and RC Car are no longer a special compiled-in tier.**
+      Previously they were hardcoded `DeviceProfile` objects with fixed
+      `roles`/`defaults`, and `Validate & Save` required all of Train's
+      four motor/audio roles to be assigned even for someone who just
+      wanted a lamp. Now they're seeded into `CustomProfileStorage`/
+      `CustomRoleStorage` exactly once on first run (see
+      `seedBuiltInsIfNeeded`) — after that they're ordinary stored
+      profiles indistinguishable from anything created through "New
+      Device": **deletable** (long-press the tab), and their individual
+      functions are now **deletable and renamable** the same way any
+      custom role already was.
+      **Migration was additive and non-destructive by design** — it
+      only adds Train/RC Car's original role keys to whatever's already
+      in `CustomRoleStorage` for those profile keys (so an already-added
+      custom role like "LED" is untouched), and existing
+      `PinConfigStorage` pin assignments needed no migration at all,
+      since they're keyed by role-key strings regardless of where the
+      role definition conceptually lives.
+      **Seeding runs exactly once, guarded by a persisted flag — not by
+      "does Train exist."** That distinction matters: checking existence
+      instead would silently resurrect Train the moment someone deleted
+      it, which would be worse than not offering deletion at all.
+      Both `PinMapperActivity` and `ControlsActivity` also now respect
+      whichever profile was last active on load (previously both always
+      forced back to Train on open, regardless of `ActiveProfile`), and
+      handle "the active profile got deleted" / "zero profiles exist"
+      gracefully by falling back to whatever's actually still there.
 - [ ] Custom/unlisted boards: let someone define a board that isn't in
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI

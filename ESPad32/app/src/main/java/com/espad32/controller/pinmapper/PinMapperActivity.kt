@@ -54,7 +54,14 @@ class PinMapperActivity : AppCompatActivity() {
         findViewById<Button>(R.id.addRoleButton).setOnClickListener { showAddRoleDialog() }
 
         buildProfileTabs()
-        loadProfile(Profiles.TRAIN)
+        val available = ProfileResolver.allProfiles(this)
+        val activeKey = com.espad32.controller.controls.ActiveProfile.get(this, Profiles.TRAIN.key)
+        val initial = available.find { it.key == activeKey } ?: available.firstOrNull()
+        if (initial != null) {
+            loadProfile(initial)
+        } else {
+            log("No devices exist yet — tap \"+\" to create one.")
+        }
     }
 
     private fun buildProfileTabs() {
@@ -150,7 +157,14 @@ class PinMapperActivity : AppCompatActivity() {
             .setPositiveButton("Delete") { _, _ ->
                 customProfileStorage.deleteProfile(profile.key)
                 log("Deleted device \"${profile.displayName}\".")
-                loadProfile(Profiles.TRAIN)
+                val remaining = ProfileResolver.allProfiles(this)
+                val fallback = remaining.firstOrNull { it.key != profile.key } ?: remaining.firstOrNull()
+                if (fallback != null) {
+                    loadProfile(fallback)
+                } else {
+                    buildProfileTabs()
+                    log("No devices left — tap \"+\" to create one.")
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()

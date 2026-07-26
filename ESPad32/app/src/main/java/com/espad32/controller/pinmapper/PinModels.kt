@@ -173,42 +173,28 @@ object Boards {
     fun byKey(key: String): BoardDef = ALL.find { it.key == key } ?: D1_MINI32
 }
 
+// Profiles.TRAIN and Profiles.RC_CAR are now just fallback KEY/BOARD
+// constants for code that needs a sensible default before real data has
+// loaded (e.g. ActiveProfile's fallback). The actual profiles — their
+// functions, defaults, everything — are seeded into CustomProfileStorage/
+// CustomRoleStorage once on first run (see ProfileResolver.kt) and from
+// then on are indistinguishable from any other user-created device:
+// renamable, and now genuinely DELETABLE, same as their individual
+// functions. See PIN_MAPPER_ROADMAP.md for why this changed.
 object Profiles {
     val TRAIN = DeviceProfile(
         key = "train",
         displayName = "Train (TB6612FNG + MAX98357A)",
         boardKey = Boards.D1_MINI32.key,
-        roles = listOf(
-            PinRoleDef("motor_dir_a", "Motor direction A", "Motor", RoleType.DIGITAL_OUTPUT),
-            PinRoleDef("motor_dir_b", "Motor direction B", "Motor", RoleType.DIGITAL_OUTPUT),
-            PinRoleDef("motor_pwm", "Motor speed (PWM)", "Motor", RoleType.PWM_OUTPUT),
-            PinRoleDef("motor_standby", "Motor standby", "Motor", RoleType.DIGITAL_OUTPUT),
-            PinRoleDef("audio_bclk", "Audio bit clock", "Audio", RoleType.AUDIO_SIGNAL),
-            PinRoleDef("audio_lrc", "Audio L/R clock", "Audio", RoleType.AUDIO_SIGNAL),
-            PinRoleDef("audio_din", "Audio data in", "Audio", RoleType.AUDIO_SIGNAL)
-        ),
-        defaults = mapOf(
-            "motor_dir_a" to 26, "motor_dir_b" to 27, "motor_pwm" to 14,
-            "motor_standby" to 12, "audio_bclk" to 25, "audio_lrc" to 33, "audio_din" to 32
-        )
+        roles = emptyList(),
+        defaults = emptyMap()
     )
 
     val RC_CAR = DeviceProfile(
         key = "rc_car",
         displayName = "RC Car",
         boardKey = Boards.D1_MINI32.key,
-        roles = listOf(
-            PinRoleDef("motor_a_dir1", "Motor A direction 1", "Drive", RoleType.DIGITAL_OUTPUT),
-            PinRoleDef("motor_a_dir2", "Motor A direction 2", "Drive", RoleType.DIGITAL_OUTPUT),
-            PinRoleDef("motor_a_pwm", "Motor A speed (PWM)", "Drive", RoleType.PWM_OUTPUT),
-            PinRoleDef("steering_servo", "Steering servo", "Steering", RoleType.SERVO),
-            PinRoleDef("headlight", "Headlights", "Lights", RoleType.DIGITAL_OUTPUT)
-        ),
-        defaults = mapOf(
-            "motor_a_dir1" to 16, "motor_a_dir2" to 17, "motor_a_pwm" to 4,
-            "steering_servo" to 18, "headlight" to 19
-        )
+        roles = emptyList(),
+        defaults = emptyMap()
     )
-
-    val ALL = listOf(TRAIN, RC_CAR)
 }

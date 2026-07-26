@@ -48,7 +48,14 @@ class ControlsActivity : AppCompatActivity() {
         findViewById<Button>(R.id.addButtonBtn).setOnClickListener { showAddButtonDialog() }
 
         buildProfileTabs()
-        loadProfile(Profiles.TRAIN)
+        val available = ProfileResolver.allProfiles(this)
+        val activeKey = ActiveProfile.get(this, Profiles.TRAIN.key)
+        val initial = available.find { it.key == activeKey } ?: available.firstOrNull()
+        if (initial != null) {
+            loadProfile(initial)
+        } else {
+            log("No devices exist yet — create one in Pin Mapper first.")
+        }
     }
 
     private fun buildProfileTabs() {
