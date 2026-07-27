@@ -42,6 +42,33 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Camera support handled as a board property, not a pin role.**
+      A camera can't be expressed as "assign this GPIO to a function"
+      the way everything else in this framework works — it's a
+      dedicated peripheral hardwired to a fixed set of ~18 pins
+      determined entirely by the physical board (an AI-Thinker
+      ESP32-CAM, for instance), not something a user picks a pin for.
+      - New `BoardDef.supportsCamera` flag, plus a new
+        `Boards.ESP32_CAM_AI_THINKER` board definition with its camera
+        interface pins marked `RESERVED` (same status already used for
+        the DevKit V1's onboard flash pins) — they simply don't show as
+        assignable in Pin Mapper, same mechanism, new use.
+      - `MainActivity`'s Photo/Record buttons (both the control-panel
+        drawer versions and the overlay-stack versions — there were two
+        separate copies) now hide entirely unless the *active profile's
+        board* actually supports a camera, checked on load and resume.
+        Previously always shown regardless of device — a leftover
+        assumption from when this app only ever talked to the Freenove
+        car.
+      **Firmware side deliberately deferred, per explicit agreement:**
+      this only addresses the app-side "should this UI even appear"
+      question. Actual camera driver init (`esp_camera_init()`) and an
+      MJPEG streaming server are real, substantial ESP32-CAM-specific
+      firmware work — nothing like the lightweight pin-config test
+      sketch, and doesn't reuse any of `SET`/`SETV`/`GET`. Revisit as
+      its own effort later.
+
+
 - [x] **Export/import a full device profile.** Long-press any device
       tab → Export shares the profile as JSON via the system share
       sheet (any app — Drive, email, Bluetooth, Slack, "copy to

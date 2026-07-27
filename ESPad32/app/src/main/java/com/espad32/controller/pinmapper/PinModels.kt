@@ -61,7 +61,13 @@ data class BoardDef(
     val key: String,
     val displayName: String,
     val leftHeader: List<BoardPin>,
-    val rightHeader: List<BoardPin>
+    val rightHeader: List<BoardPin>,
+    // Whether this board has a camera module wired to fixed pins. Not
+    // something a pin-role mapping can express — camera pins are a
+    // property of the physical board itself (marked RESERVED below on
+    // camera-capable boards), not something a user assigns like any
+    // other function.
+    val supportsCamera: Boolean = false
 ) {
     fun allPins(): List<BoardPin> = leftHeader + rightHeader
     fun findByGpio(gpio: Int): BoardPin? = allPins().find { it.gpio == gpio }
@@ -174,7 +180,50 @@ object Boards {
     // val ESP32_S3_DEVKIT = BoardDef(key = "esp32_s3_devkit", ...)
     // val ESP32_C3        = BoardDef(key = "esp32_c3", ...)
 
-    val ALL = listOf(D1_MINI32, ESP32_DEVKIT_V1)
+    // AI-Thinker ESP32-CAM. Unlike every other board here, most of its
+    // pins aren't general-purpose at all — they're hardwired to the
+    // camera module itself and marked RESERVED, the same status used
+    // for the DevKit's onboard-flash pins. A camera isn't something a
+    // pin role can express (there's no "assign this GPIO to be a
+    // camera" — the wiring is fixed by the board), so this is handled
+    // as a board-level property instead: supportsCamera = true.
+    // NOTE: this board exposes very few free GPIOs beyond the camera
+    // itself (most are consumed by the camera interface) — verify
+    // against your specific board/schematic before relying on this.
+    val ESP32_CAM_AI_THINKER = BoardDef(
+        key = "esp32_cam_ai_thinker",
+        displayName = "ESP32-CAM (AI-Thinker)",
+        supportsCamera = true,
+        leftHeader = listOf(
+            BoardPin("D0/Y2", 5, PinStatus.RESERVED),
+            BoardPin("D1/Y3", 18, PinStatus.RESERVED),
+            BoardPin("D2/Y4", 19, PinStatus.RESERVED),
+            BoardPin("D3/Y5", 21, PinStatus.RESERVED),
+            BoardPin("D4/Y6", 36, PinStatus.RESERVED),
+            BoardPin("D5/Y7", 39, PinStatus.RESERVED),
+            BoardPin("D6/Y8", 34, PinStatus.RESERVED),
+            BoardPin("D7/Y9", 35, PinStatus.RESERVED),
+            BoardPin("XCLK", 0, PinStatus.RESERVED),
+            BoardPin("PCLK", 22, PinStatus.RESERVED)
+        ),
+        rightHeader = listOf(
+            BoardPin("VSYNC", 25, PinStatus.RESERVED),
+            BoardPin("HREF", 23, PinStatus.RESERVED),
+            BoardPin("SIOD", 26, PinStatus.RESERVED),
+            BoardPin("SIOC", 27, PinStatus.RESERVED),
+            BoardPin("PWDN", 32, PinStatus.RESERVED),
+            BoardPin("Flash LED", 4, PinStatus.AVAILABLE),
+            BoardPin("Status LED", 33, PinStatus.AVAILABLE),
+            BoardPin("12", 12, PinStatus.STRAPPING),
+            BoardPin("13", 13, PinStatus.AVAILABLE),
+            BoardPin("14", 14, PinStatus.AVAILABLE),
+            BoardPin("15", 15, PinStatus.STRAPPING),
+            BoardPin("2", 2, PinStatus.STRAPPING),
+            BoardPin("16", 16, PinStatus.AVAILABLE)
+        )
+    )
+
+    val ALL = listOf(D1_MINI32, ESP32_DEVKIT_V1, ESP32_CAM_AI_THINKER)
 
     fun byKey(key: String): BoardDef = ALL.find { it.key == key } ?: D1_MINI32
 }
