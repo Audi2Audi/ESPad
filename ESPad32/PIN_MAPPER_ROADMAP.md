@@ -7,6 +7,17 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] **GPIO dropdown per function row**, as a faster alternative to
+      tap-role-then-tap-pin-on-diagram (which still works too — this
+      doesn't replace it, just adds a quicker path). Reuses the exact
+      same validation the board-diagram tap flow uses
+      (`PinValidation.canAssign`), so the dropdown can never offer a
+      pin that tapping would reject — same risky-pin `⚠` marking for
+      strapping/UART pins, same "bump the other role holding this pin"
+      behavior and logging. Extracted into a shared
+      `assignGpioToRole()` so the board-tap flow and dropdown can never
+      quietly drift into different behavior over time.
+
 - [x] **Fixed:** Controls' "Add Button" role picker was an unbounded
       horizontal row of buttons with no scrolling or wrapping — once
       there were more than ~3-4 eligible roles, longer labels (e.g.

@@ -5,9 +5,12 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.espad32.controller.R // adjust if your R class lives elsewhere
@@ -353,17 +356,50 @@ class PinMapperActivity : AppCompatActivity() {
     private fun onPinTapped(pin: BoardPin) {
         val roleKey = pendingRoleKey ?: return
         val gpio = pin.gpio ?: return
-        val result = PinValidation.canAssign(pin, roleKey)
+        assignGpioToRole(roleKey, gpio)
+    }
 
+    /**
+     * Single source of truth for "assign this GPIO to this role" —
+     * used by both tapping a pin on the board diagram (pendingRoleKey
+     * flow) and the per-row GPIO dropdown. Keeping this in one place
+     * means both paths handle validation, bumping another role that
+     * already holds the pin, and logging identically rather than two
+     * slightly-different implementations drifting apart over time.
+     *
+     * newGpio == null means "unassign" (used by the dropdown's
+     * "Unassigned" option — tapping the board diagram has no
+     * equivalent for this, since there's no "empty" pin to tap).
+     */
+    private fun assignGpioToRole(roleKey: String, newGpio: Int?) {
+        val roleLabel = effectiveRoles().find { it.key == roleKey }?.label ?: roleKey
+
+        if (newGpio == null) {
+            assignments[roleKey] = null
+            log("\"$roleLabel\" unassigned.")
+            pendingRoleKey = if (pendingRoleKey == roleKey) null else pendingRoleKey
+            renderBoard()
+            renderRoles()
+            return
+        }
+
+        val board = Boards.byKey(currentBoardKey)
+        val pin = board.findByGpio(newGpio)
+        if (pin == null) {
+            log("NACK — GPIO $newGpio isn't on this board.")
+            return
+        }
+
+        val result = PinValidation.canAssign(pin, roleKey)
         if (!result.ok) {
-            log("NACK — GPIO $gpio rejected: ${result.reason}")
+            log("NACK — GPIO $newGpio rejected: ${result.reason}")
             return
         }
 
         // Clear any other role currently holding this GPIO — and say so
         // clearly, since bumping a required built-in role will block
         // Validate & Save until it's reassigned somewhere else.
-        assignments.entries.find { it.value == gpio && it.key != roleKey }?.let { bumped ->
+        assignments.entries.find { it.value == newGpio && it.key != roleKey }?.let { bumped ->
             assignments[bumped.key] = null
             val bumpedLabel = effectiveRoles().find { it.key == bumped.key }?.label ?: bumped.key
             val isCustom = customRoles.any { it.key == bumped.key }
@@ -373,13 +409,12 @@ class PinMapperActivity : AppCompatActivity() {
                 log("\"$bumpedLabel\" is now unassigned — it's required, so you'll need to give it a new pin before you can Validate & Save.")
             }
         }
-        assignments[roleKey] = gpio
+        assignments[roleKey] = newGpio
 
-        val roleLabel = effectiveRoles().find { it.key == roleKey }?.label ?: roleKey
         if (PinValidation.isRisky(pin)) {
-            log("GPIO $gpio assigned to \"$roleLabel\" — ${pin.status?.displayLabel?.lowercase()}.")
+            log("GPIO $newGpio assigned to \"$roleLabel\" — ${pin.status?.displayLabel?.lowercase()}.")
         } else {
-            log("GPIO $gpio assigned to \"$roleLabel\".")
+            log("GPIO $newGpio assigned to \"$roleLabel\".")
         }
 
         pendingRoleKey = null
@@ -438,15 +473,49 @@ class PinMapperActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        val valueView = TextView(this).apply {
-            text = if (gpio != null) "GPIO $gpio" else "unassigned"
-            setTextColor(Color.parseColor(if (gpio != null) "#C7CCD1" else "#E0645C"))
-            textSize = 12f
-            typeface = android.graphics.Typeface.MONOSPACE
+        // Options: "Unassigned" plus every GPIO on the current board
+        // that's actually valid for this role's type — same filter
+        // (PinValidation.canAssign) the board-diagram tap flow uses, so
+        // the dropdown can never offer a pin tapping would have
+        // rejected. Risky-but-allowed pins (strapping/UART) are marked
+        // the same way the board diagram marks them.
+        val board = Boards.byKey(currentBoardKey)
+        val options = mutableListOf<Pair<String, Int?>>().apply {
+            add("Unassigned" to null)
+            board.allPins().forEach { pin ->
+                val pinGpio = pin.gpio ?: return@forEach
+                if (PinValidation.canAssign(pin, role.key).ok) {
+                    val label = if (PinValidation.isRisky(pin)) "GPIO $pinGpio ⚠" else "GPIO $pinGpio"
+                    add(label to pinGpio)
+                }
+            }
+            // Guarantee the currently-assigned pin is always shown, even
+            // in the unlikely case it wouldn't pass today's validation
+            // (e.g. board was switched since it was assigned) — the
+            // dropdown should always be able to reflect real state.
+            if (gpio != null && none { it.second == gpio }) {
+                add("GPIO $gpio" to gpio)
+            }
+        }
+
+        val spinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@PinMapperActivity, android.R.layout.simple_spinner_item, options.map { it.first }
+            ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        }
+        val initialIndex = options.indexOfFirst { it.second == gpio }.let { if (it >= 0) it else 0 }
+        spinner.setSelection(initialIndex, false)
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val selectedGpio = options[position].second
+                if (selectedGpio == gpio) return // initial fire / re-selecting current value — no-op
+                assignGpioToRole(role.key, selectedGpio)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
         row.addView(nameView)
-        row.addView(valueView)
+        row.addView(spinner)
 
         // Custom roles get a visible delete icon — relying on a hidden
         // long-press alone made deletion undiscoverable. Built-in roles
