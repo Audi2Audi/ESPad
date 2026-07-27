@@ -260,7 +260,7 @@ class OtaActivity : AppCompatActivity() {
     }
 
     private fun flashFromAssets() {
-        val assetName = "06_3_Multi_Functional_Car.ino.bin"
+        val assetName = "espad_default_firmware.bin"
         try {
             assets.open(assetName)  // test it exists
         } catch (e: Exception) {

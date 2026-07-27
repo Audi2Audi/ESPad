@@ -7,6 +7,44 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] **Firmware OTA HTTP server built, matching the app's existing
+      protocol.** The app-side OTA mechanism (`OtaActivity.kt`, plus a
+      duplicate flow in `SettingsDialogFragment.kt`'s OTA tab) was
+      already real and complete — it just had nothing to talk to,
+      since the test firmware had no HTTP server at all. Now it does:
+      - New `ota.h`: raw `WiFiServer` on port 8080 (alongside the
+        existing command server on 4000 and UDP discovery on 4210).
+        `GET /ota/status` responds 200 with a simple body. `POST
+        /ota/upload` decodes HTTP chunked transfer-encoding by hand
+        (the app sends `Transfer-Encoding: chunked` via
+        `HttpURLConnection.setChunkedStreamingMode()`, not a fixed
+        `Content-Length` — deliberately NOT using ESP32's `WebServer`
+        library here, since its upload handling assumes multipart
+        form-data, not a raw octet-stream body) and writes bytes via
+        ESP32's built-in `Update` library as they arrive.
+      - Added `CMD_VERSION#` to the TCP command channel too — the OTA
+        screen's "Firmware v___" display and post-update verification
+        depend on it, and it was previously unimplemented on the
+        firmware side even though the app already had a (broken, now
+        fixed) code path expecting it.
+      - **Renamed the hardcoded default-firmware filename** the app
+        expects for its "Flash Default" button, from
+        `06_3_Multi_Functional_Car.ino.bin` (the original Freenove
+        sketch's literal compiled output name) to
+        `espad_default_firmware.bin`, in both `OtaActivity.kt` and the
+        duplicate flow in `SettingsDialogFragment.kt`, plus the
+        `assets/README.txt` instructions. No functional Freenove
+        references remain anywhere in the app or firmware — only a
+        few historical code comments explaining *why* earlier
+        Freenove-specific features were removed, which are useful
+        engineering history rather than functional identifiers.
+      **Not yet done:** the two duplicate OTA UIs (`OtaActivity` full
+      screen vs. the Settings dialog's OTA tab) both work now, but
+      having the exact same upload logic maintained twice in two
+      places is worth consolidating into one shared implementation at
+      some point, rather than something that needs fixing right now.
+
+
 - [x] **Generic analog input (battery voltage, or any other live sensor
       reading) — replaces the dead Freenove-specific CMD_POWER
       mechanism.** Previously the app polled `CMD_POWER#` every 15s

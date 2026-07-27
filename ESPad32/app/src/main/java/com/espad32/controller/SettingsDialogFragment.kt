@@ -734,7 +734,7 @@ class SettingsDialogFragment : DialogFragment() {
 
         btnDefault.setOnClickListener {
             try {
-                val bytes = requireContext().assets.open("06_3_Multi_Functional_Car.ino.bin").readBytes()
+                val bytes = requireContext().assets.open("espad_default_firmware.bin").readBytes()
                 cachedBytes = bytes; btnFlash.isEnabled = true
                 doFlash(bytes)
             } catch (e: Exception) {
