@@ -40,6 +40,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var joystickLeft: JoystickView
     private lateinit var joystickRight: JoystickView
     private lateinit var controlButtonStorage: ControlButtonStorage
+    private lateinit var pinConfigStorageForSensor: com.espad32.controller.pinmapper.PinConfigStorage
+    private lateinit var customRoleStorageForSensor: com.espad32.controller.pinmapper.CustomRoleStorage
 
     private var carIp = "192.168.4.1"
     private var tcpClient: TcpClient? = null
@@ -127,6 +129,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         surfaceView      = findViewById(R.id.surfaceView)
         tvStatus         = findViewById(R.id.tvStatus)
         tvBattery        = findViewById(R.id.tvBattery)
+        tvBattery.visibility = android.view.View.GONE // shown only if the active profile has an ANALOG_INPUT role assigned
         tvIp             = findViewById(R.id.tvIp)
         findViewById<android.widget.Button>(R.id.btnSearchDevicesTop).setOnClickListener {
             searchForDevicesFromMain()
@@ -136,6 +139,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         joystickLeft     = findViewById(R.id.joystickLeft)
         joystickRight    = findViewById(R.id.joystickRight)
         controlButtonStorage = ControlButtonStorage(this)
+        pinConfigStorageForSensor = com.espad32.controller.pinmapper.PinConfigStorage(this)
+        customRoleStorageForSensor = com.espad32.controller.pinmapper.CustomRoleStorage(this)
 
         mediaSaver = MediaSaver(this)
         ThemeManager.load(this)
@@ -377,7 +382,53 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun startBatteryPolling() {
         batteryJob?.cancel()
         batteryJob = scope.launch {
-            while (isActive) { enqueue("CMD_POWER#\n"); delay(15000) }
+            while (isActive) {
+                pollAnalogSensorIfConfigured()
+                delay(15000)
+            }
+        }
+    }
+
+    // Generic replacement for the old Freenove-specific CMD_POWER poll.
+    // CMD_POWER assumed a fixed onboard voltage-divider circuit that
+    // only the real car board has — nothing a custom device (train,
+    // lamp, whatever) can rely on. Instead: if the ACTIVE profile has
+    // an ANALOG_INPUT role assigned to a real pin, poll THAT via the
+    // generic GET command. If not, hide the display entirely rather
+    // than show a permanent, meaningless "--V".
+    private fun pollAnalogSensorIfConfigured() {
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(this, Profiles.TRAIN.key)
+        val profile = com.espad32.controller.pinmapper.ProfileResolver.allProfiles(this)
+            .find { it.key == profileKey } ?: run {
+                mainHandler.post { tvBattery.visibility = android.view.View.GONE }
+                return
+            }
+
+        val roles = com.espad32.controller.pinmapper.RoleResolver.effectiveRoles(profile, customRoleStorageForSensor)
+        val analogRole = roles.find { it.type == com.espad32.controller.pinmapper.RoleType.ANALOG_INPUT }
+        if (analogRole == null) {
+            mainHandler.post { tvBattery.visibility = android.view.View.GONE }
+            return
+        }
+
+        val boardKey = pinConfigStorageForSensor.loadSelectedBoard(profile.key, profile.boardKey)
+        val assignments = pinConfigStorageForSensor.load(profile.key, boardKey, profile.defaults)
+        val gpio = assignments[analogRole.key]
+        if (gpio == null) {
+            mainHandler.post { tvBattery.visibility = android.view.View.GONE }
+            return
+        }
+
+        com.espad32.controller.controls.DeviceCommand.sendGet(analogRole.key) { response ->
+            val millivolts = response?.substringAfterLast("-> ")?.removeSuffix("mV")?.trim()?.toIntOrNull()
+            mainHandler.post {
+                if (millivolts != null) {
+                    tvBattery.visibility = android.view.View.VISIBLE
+                    tvBattery.text = "${analogRole.label}: ${"%.2f".format(millivolts / 1000f)}V"
+                } else {
+                    tvBattery.visibility = android.view.View.GONE
+                }
+            }
         }
     }
 
@@ -415,21 +466,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
             return
         }
-        if (data.startsWith("CMD_POWER")) {
-            val voltage = data.split("#").getOrNull(1)?.trim() ?: return
-            val volts = voltage.toFloatOrNull() ?: return
-            mainHandler.post {
-                tvBattery.text = "🔋 ${voltage}V"
-                updateEsp32Battery(volts)
-            }
-            return
-        }
-
         // Generic passthrough for anyone waiting on the next line via
-        // MainTcpHolder.onNextData (Pin Mapper/Controls SET command
-        // responses, OtaActivity's version query, etc). CMD_WIFI and
-        // CMD_POWER are already fully handled above and return before
-        // reaching here, so this only fires for everything else.
+        // MainTcpHolder.onNextData (Pin Mapper/Controls SET/SETV/GET
+        // command responses, OtaActivity's version query, etc). CMD_WIFI
+        // is already fully handled above and returns before reaching
+        // here, so this only fires for everything else.
         MainTcpHolder.onNextData?.let { cb ->
             cb(data)
             MainTcpHolder.onNextData = null

@@ -12,7 +12,13 @@ enum class RoleType {
     PWM_OUTPUT,
     SERVO,
     DIGITAL_INPUT,
-    AUDIO_SIGNAL
+    AUDIO_SIGNAL,
+    // A readable analog value (0-3.3V range) — e.g. battery voltage via
+    // a voltage divider. Only assignable to ADC1 pins (32/33/34/35/36/39)
+    // — ADC2 pins conflict with WiFi on the ESP32 and give unreliable
+    // readings whenever the radio is active, which for this app is
+    // always. See PinValidation.ADC1_PINS.
+    ANALOG_INPUT
 }
 
 /** A single assignable function on a device profile (e.g. "motor_dir_a"). */

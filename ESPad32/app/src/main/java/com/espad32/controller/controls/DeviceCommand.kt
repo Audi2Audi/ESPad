@@ -49,6 +49,11 @@ object DeviceCommand {
         sendRaw("SETV $role $wireValue\n", onResult)
     }
 
+    /** Sends GET <role> for ANALOG_INPUT roles (e.g. battery voltage via a divider). */
+    fun sendGet(role: String, onResult: (String?) -> Unit) {
+        sendRaw("GET $role\n", onResult)
+    }
+
     /**
      * Sends any single-line command (a SET command, or a full JSON pin
      * config payload — both are just one line ending in \n) and captures

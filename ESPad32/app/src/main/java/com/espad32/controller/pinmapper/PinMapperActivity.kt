@@ -373,6 +373,7 @@ class PinMapperActivity : AppCompatActivity() {
      */
     private fun assignGpioToRole(roleKey: String, newGpio: Int?) {
         val roleLabel = effectiveRoles().find { it.key == roleKey }?.label ?: roleKey
+        val roleType = effectiveRoles().find { it.key == roleKey }?.type ?: RoleType.DIGITAL_OUTPUT
 
         if (newGpio == null) {
             assignments[roleKey] = null
@@ -390,7 +391,7 @@ class PinMapperActivity : AppCompatActivity() {
             return
         }
 
-        val result = PinValidation.canAssign(pin, roleKey)
+        val result = PinValidation.canAssign(pin, roleType)
         if (!result.ok) {
             log("NACK — GPIO $newGpio rejected: ${result.reason}")
             return
@@ -511,7 +512,7 @@ class PinMapperActivity : AppCompatActivity() {
             }
             board.allPins().forEach { pin ->
                 val pinGpio = pin.gpio ?: return@forEach
-                if (PinValidation.canAssign(pin, role.key).ok) {
+                if (PinValidation.canAssign(pin, role.type).ok) {
                     val label = if (PinValidation.isRisky(pin)) "GPIO $pinGpio ⚠" else "GPIO $pinGpio"
                     add(label to pinGpio)
                 }
@@ -592,35 +593,46 @@ class PinMapperActivity : AppCompatActivity() {
 
         var selectedType = RoleType.DIGITAL_OUTPUT
         val typeRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+
+        val typeButtons = mutableMapOf<RoleType, Button>()
+        fun highlightSelected() {
+            typeButtons.forEach { (t, btn) ->
+                if (t == selectedType) {
+                    btn.setBackgroundColor(Color.parseColor("#262D35"))
+                    btn.setTextColor(Color.parseColor("#E3A458"))
+                } else {
+                    btn.setBackgroundColor(Color.TRANSPARENT)
+                    btn.setTextColor(Color.parseColor("#8A939C"))
+                }
+            }
+        }
+
         val digitalBtn = Button(this).apply {
             text = "On/Off"
+            textSize = 11f
             isAllCaps = false
-            setBackgroundColor(Color.parseColor("#262D35"))
-            setTextColor(Color.parseColor("#E3A458"))
+            setOnClickListener { selectedType = RoleType.DIGITAL_OUTPUT; highlightSelected() }
         }
         val pwmBtn = Button(this).apply {
             text = "PWM (0-255)"
+            textSize = 11f
             isAllCaps = false
-            setBackgroundColor(Color.TRANSPARENT)
-            setTextColor(Color.parseColor("#8A939C"))
+            setOnClickListener { selectedType = RoleType.PWM_OUTPUT; highlightSelected() }
         }
-        digitalBtn.setOnClickListener {
-            selectedType = RoleType.DIGITAL_OUTPUT
-            digitalBtn.setBackgroundColor(Color.parseColor("#262D35"))
-            digitalBtn.setTextColor(Color.parseColor("#E3A458"))
-            pwmBtn.setBackgroundColor(Color.TRANSPARENT)
-            pwmBtn.setTextColor(Color.parseColor("#8A939C"))
+        val analogBtn = Button(this).apply {
+            text = "Analog In"
+            textSize = 11f
+            isAllCaps = false
+            setOnClickListener { selectedType = RoleType.ANALOG_INPUT; highlightSelected() }
         }
-        pwmBtn.setOnClickListener {
-            selectedType = RoleType.PWM_OUTPUT
-            pwmBtn.setBackgroundColor(Color.parseColor("#262D35"))
-            pwmBtn.setTextColor(Color.parseColor("#E3A458"))
-            digitalBtn.setBackgroundColor(Color.TRANSPARENT)
-            digitalBtn.setTextColor(Color.parseColor("#8A939C"))
-        }
+        typeButtons[RoleType.DIGITAL_OUTPUT] = digitalBtn
+        typeButtons[RoleType.PWM_OUTPUT] = pwmBtn
+        typeButtons[RoleType.ANALOG_INPUT] = analogBtn
         typeRow.addView(digitalBtn)
         typeRow.addView(pwmBtn)
+        typeRow.addView(analogBtn)
         container.addView(typeRow)
+        highlightSelected()
 
         // SERVO isn't offered — firmware has no angle-control command
         // yet (SETV is PWM duty only), so creating a SERVO role here
@@ -628,7 +640,10 @@ class PinMapperActivity : AppCompatActivity() {
         // correctly. See PIN_MAPPER_ROADMAP.md.
         val noteText = TextView(this).apply {
             text = "On/Off backs a toggle button in Controls. PWM backs a slider " +
-                "(0-255) — servo angle control isn't supported by the firmware yet."
+                "(0-255). Analog In reads a live voltage — e.g. battery level via " +
+                "your own voltage divider — and can only go on an ADC1 pin " +
+                "(32/33/34/35/36/39, marked available in the diagram above); servo " +
+                "angle control isn't supported by the firmware yet."
             textSize = 11f
             setTextColor(Color.parseColor("#5F6A73"))
             setPadding(0, 20, 0, 0)

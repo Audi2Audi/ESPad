@@ -7,6 +7,47 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] **Generic analog input (battery voltage, or any other live sensor
+      reading) — replaces the dead Freenove-specific CMD_POWER
+      mechanism.** Previously the app polled `CMD_POWER#` every 15s
+      unconditionally, assuming a fixed onboard voltage-divider circuit
+      that only the real Freenove car board has — meaningless for any
+      custom device, and our test firmware never even understood the
+      command. Now battery/sensor voltage is just another pin role
+      type, fitting the same framework as everything else:
+      - New `RoleType.ANALOG_INPUT`, selectable in Pin Mapper's "Add
+        Function" type picker alongside On/Off and PWM.
+      - **ADC1-only constraint, for a real hardware reason:** the ESP32
+        has two ADC units: ADC2 pins share circuitry with the WiFi
+        radio and give unreliable/blocked readings whenever WiFi is
+        active — which for this app is always (the AP never turns
+        off). `PinValidation` now restricts `ANALOG_INPUT` to the 6
+        ADC1 pins (32/33/34/35/36/39) — `canAssign()` had to become
+        role-*type*-aware (not just role-key-string-aware) to support
+        this, which every call site now reflects.
+      - Firmware: new `GET <role>` command, using
+        `analogReadMilliVolts()` (ESP32's factory-calibrated ADC read)
+        rather than a raw 0-4095 value scaled by hand. Reports the
+        actual voltage AT THE PIN — if sensing a battery above the
+        ESP32's ADC range (e.g. a 2S+ LiPo), the user needs their own
+        voltage divider and their own math to convert pin voltage back
+        to real battery voltage; the firmware has no concept of a
+        divider ratio.
+      - App: `MainActivity` now polls generically — if the *active*
+        profile has an `ANALOG_INPUT` role assigned to a real pin, it
+        polls that (via `DeviceCommand.sendGet()`) every 15s and shows
+        `<function label>: <voltage>V` in the old battery indicator's
+        spot. If no such role exists for the active profile, the
+        indicator hides entirely instead of showing a permanent,
+        meaningless placeholder.
+      **Known gap:** firmware doesn't independently re-validate the
+      ADC1-only restriction — the JSON config payload has no field for
+      role *type* yet, only `{gpio, role}`, so firmware can't tell
+      "this is meant to be analog" from "this is meant to be digital."
+      The app is currently the only thing enforcing ADC1-only; reading
+      an ADC2 pin via `GET` would still return a number, just an
+      unreliable one while WiFi is active.
+
 - [x] **GPIO dropdown per function row**, as a faster alternative to
       tap-role-then-tap-pin-on-diagram (which still works too — this
       doesn't replace it, just adds a quicker path). Reuses the exact
