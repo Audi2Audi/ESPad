@@ -28,19 +28,51 @@ from when picking the next increment.
 
 ## Future idea, not started
 
-- **A web-hosted companion service.** Two things it could offer that
-  are awkward on a phone: (1) flashing the default firmware to a
-  brand-new ESP32 from a PC (no Arduino IDE setup needed — just plug
-  in over USB and a browser-based flasher does the rest, similar to
-  how esphome/esp-web-tools style in-browser flashing works via
-  WebSerial), and (2) building/editing device profiles on a larger
-  screen with a real keyboard, then exporting to the phone app (or
-  vice versa) using the same JSON export/import format above — the
-  format is already shared/portable, so a web tool producing the same
-  JSON would slot in without needing app-side changes. Not scoped or
-  estimated yet, just worth remembering as a direction if the
-  phone-only workflow becomes a real friction point for onboarding new
-  users.
+- **Two different hosting models for the "PC-based profile creator"
+  idea — worth comparing rather than assuming one is obviously right:**
+
+  **Option A — self-hosted on the ESP32 itself (favored as the nearer-
+  term option).** Once the default sketch is flashed, visiting the
+  device's own IP in a browser shows a page for creating/editing
+  functions and pin mappings, directly on the device — no separate
+  export/import round-trip needed at all, since the page could just
+  read/write the device's own stored config in real time. This reuses
+  infrastructure already built and proven: the OTA HTTP server (`ota.h`)
+  already established the pattern of a raw `WiFiServer`-based request
+  handler on this firmware, which a small config-editing page could
+  extend (serve a lightweight HTML/vanilla-JS page, plus simple
+  endpoints to read/write the same JSON pin-config format the app
+  already sends over the TCP command channel).
+  - *Pros:* zero external hosting/maintenance, works fully offline on
+    the device's own local AP (matches the existing "AP always up"
+    philosophy), always talking to the actual physical device rather
+    than a disconnected builder that syncs later, no new
+    infrastructure beyond what this firmware already does.
+  - *Cons:* ESP32 has limited RAM/flash for a rich UI — needs to stay
+    genuinely lightweight, same hand-rolled-HTTP constraints the OTA
+    server already lives with; only reachable from a PC on the same
+    network as that specific device (its AP, or the same LAN in STA
+    mode) — no "plan a profile before you own a device" workflow.
+
+  **Option B — a separately-hosted web service.** Covers two things
+  Option A can't: (1) flashing the default firmware to a brand-new
+  ESP32 from a PC with no Arduino IDE at all (browser-based, similar to
+  esphome/esp-web-tools style in-browser flashing via WebSerial), and
+  (2) building/editing a profile before you even own or have flashed a
+  device. Would use the same JSON export/import format already built,
+  so it could interoperate with both the app and Option A without
+  needing either to change.
+  - *Pros:* works with zero hardware in hand, one central place
+    regardless of which device you're near.
+  - *Cons:* real hosting/maintenance overhead, needs internet access
+    (unlike the device-local option), and duplicates a chunk of what
+    Option A would already do for the profile-editing half.
+
+  These aren't mutually exclusive — Option A is the more natural next
+  step given what already exists; Option B's *flashing* half (getting
+  a brand-new blank ESP32 running the default sketch in the first
+  place) is the one piece Option A can't cover, since a device with no
+  firmware yet can't host anything.
 
 - [x] **Firmware OTA HTTP server built, matching the app's existing
       protocol.** The app-side OTA mechanism (`OtaActivity.kt`, plus a
