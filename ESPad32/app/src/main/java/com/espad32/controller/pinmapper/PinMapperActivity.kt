@@ -84,11 +84,7 @@ class PinMapperActivity : AppCompatActivity() {
                 )
                 setOnClickListener { loadProfile(profile) }
                 setOnLongClickListener {
-                    // Built-in profiles (Train/RC Car) can't be deleted —
-                    // only user-created ones.
-                    if (customProfileStorage.loadProfiles().any { it.key == profile.key }) {
-                        showDeleteDeviceDialog(profile)
-                    }
+                    showManageDeviceDialog(profile)
                     true
                 }
             }
@@ -138,7 +134,30 @@ class PinMapperActivity : AppCompatActivity() {
         }
         container.addView(boardRow)
 
-        AlertDialog.Builder(this)
+        // Alternative to filling in the form above: paste a profile
+        // someone else exported (or one you exported from another
+        // install) instead of building it from scratch.
+        container.addView(TextView(this).apply {
+            text = "— or —"
+            setTextColor(Color.parseColor("#5F6A73"))
+            textSize = 11f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, 20, 0, 4)
+        })
+        val importInput = EditText(this).apply {
+            hint = "Paste an exported device's JSON here"
+            minLines = 3
+            gravity = Gravity.TOP
+        }
+        container.addView(importInput)
+        val importBtn = Button(this).apply {
+            text = "Import from pasted text"
+            textSize = 11f
+            isAllCaps = false
+        }
+        container.addView(importBtn)
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("New Device")
             .setView(container)
             .setPositiveButton("Create") { _, _ ->
@@ -150,7 +169,61 @@ class PinMapperActivity : AppCompatActivity() {
                 )
             }
             .setNegativeButton("Cancel", null)
+            .create()
+
+        importBtn.setOnClickListener {
+            val text = importInput.text.toString().trim()
+            if (text.isEmpty()) {
+                log("Paste an exported profile's text first.")
+                return@setOnClickListener
+            }
+            val result = ProfileExportImport.importFromJson(this, text)
+            if (result.profile != null) {
+                log("Imported \"${result.profile.displayName}\".")
+                dialog.dismiss()
+                loadProfile(result.profile)
+            } else {
+                log("Import failed: ${result.error}")
+            }
+        }
+
+        dialog.show()
+    }
+
+    private fun showManageDeviceDialog(profile: DeviceProfile) {
+        AlertDialog.Builder(this)
+            .setTitle(profile.displayName)
+            .setItems(arrayOf("Export", "Delete")) { _, which ->
+                when (which) {
+                    0 -> exportDevice(profile)
+                    1 -> showDeleteDeviceDialog(profile)
+                }
+            }
+            .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    // Shares the profile as JSON via the system share sheet (any app —
+    // Drive, email, Bluetooth, "Copy to clipboard" via Files, etc) so
+    // it doesn't need Android's storage/file-picker permissions at all
+    // for something this small.
+    private fun exportDevice(profile: DeviceProfile) {
+        val roles = effectiveRolesFor(profile)
+        val json = ProfileExportImport.buildExportJson(this, profile, roles)
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "ESPad device: ${profile.displayName}")
+            putExtra(android.content.Intent.EXTRA_TEXT, json)
+        }
+        startActivity(android.content.Intent.createChooser(shareIntent, "Export \"${profile.displayName}\""))
+        log("Exported \"${profile.displayName}\" (${roles.size} function(s)).")
+    }
+
+    // Same merge effectiveRoles() does for the CURRENTLY loaded profile,
+    // but for an arbitrary one — export can be triggered for a profile
+    // that isn't the one currently open in this screen.
+    private fun effectiveRolesFor(profile: DeviceProfile): List<PinRoleDef> {
+        return RoleResolver.effectiveRoles(profile, customRoleStorage)
     }
 
     private fun showDeleteDeviceDialog(profile: DeviceProfile) {

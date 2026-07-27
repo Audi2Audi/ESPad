@@ -7,6 +7,41 @@ from when picking the next increment.
 
 ## Status: done so far
 
+- [x] **Export/import a full device profile.** Long-press any device
+      tab → Export shares the profile as JSON via the system share
+      sheet (any app — Drive, email, Bluetooth, Slack, "copy to
+      clipboard," etc) — deliberately not a file-picker/SAF flow,
+      since a small JSON blob doesn't need Android's storage
+      permission complexity. "+ New Device" now also offers pasting
+      an exported profile's text as an alternative to filling in the
+      name/board form, importing it as a brand-new profile with a
+      fresh, guaranteed-unique key (never overwrites an existing one,
+      even re-importing onto the same device that exported it).
+      Exports functions (with any label already flattened in — no
+      separate override layer needed for a portable snapshot), pin
+      assignments for the profile's board, and Controls buttons.
+      **Deliberately NOT included:** gamepad mappings. `ControllerMapping`
+      is one global list for the whole app (which physical GameSir
+      button does what), not scoped per device profile at all — there's
+      no clean "this profile's gamepad mappings" to export today. A
+      real limitation, not an oversight.
+
+## Future idea, not started
+
+- **A web-hosted companion service.** Two things it could offer that
+  are awkward on a phone: (1) flashing the default firmware to a
+  brand-new ESP32 from a PC (no Arduino IDE setup needed — just plug
+  in over USB and a browser-based flasher does the rest, similar to
+  how esphome/esp-web-tools style in-browser flashing works via
+  WebSerial), and (2) building/editing device profiles on a larger
+  screen with a real keyboard, then exporting to the phone app (or
+  vice versa) using the same JSON export/import format above — the
+  format is already shared/portable, so a web tool producing the same
+  JSON would slot in without needing app-side changes. Not scoped or
+  estimated yet, just worth remembering as a direction if the
+  phone-only workflow becomes a real friction point for onboarding new
+  users.
+
 - [x] **Firmware OTA HTTP server built, matching the app's existing
       protocol.** The app-side OTA mechanism (`OtaActivity.kt`, plus a
       duplicate flow in `SettingsDialogFragment.kt`'s OTA tab) was
