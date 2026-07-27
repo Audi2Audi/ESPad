@@ -65,6 +65,14 @@
             android:textColor="#5F6A73"
             android:textSize="11sp"
             android:layout_marginTop="20dp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⚠ next to a pin means it also has a special job when the board first turns on, or is normally used to talk to your computer over USB. It will usually still work fine for your project — the warning just means it's worth double-checking if that pin ever behaves strangely, especially right after the board starts up."
+            android:textColor="#5F6A73"
+            android:textSize="10.5sp"
             android:layout_marginBottom="8dp" />
 
         <LinearLayout

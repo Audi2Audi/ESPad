@@ -466,22 +466,49 @@ class PinMapperActivity : AppCompatActivity() {
             }
         }
 
+        // Custom roles get a visible delete icon — relying on a hidden
+        // long-press alone made deletion undiscoverable. Built-in roles
+        // stay long-press-to-rename only (they can't be deleted). Placed
+        // on the left, ahead of the function name, so it doesn't get
+        // confused with the pin-clearing button on the right.
+        val isCustom = customRoles.any { it.key == role.key }
+        if (isCustom) {
+            val deleteBtn = TextView(this).apply {
+                text = "🗑"
+                textSize = 14f
+                setPadding(0, 0, 24, 0)
+                setOnClickListener {
+                    // Don't let this bubble up to the row's own click
+                    // listener (which toggles pin-assignment mode).
+                    showEditRoleDialog(role)
+                }
+            }
+            row.addView(deleteBtn)
+        }
+
         val nameView = TextView(this).apply {
             text = role.label
             setTextColor(Color.parseColor("#E7EBEE"))
             textSize = 13f
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
+        row.addView(nameView)
 
-        // Options: "Unassigned" plus every GPIO on the current board
-        // that's actually valid for this role's type — same filter
-        // (PinValidation.canAssign) the board-diagram tap flow uses, so
-        // the dropdown can never offer a pin tapping would have
-        // rejected. Risky-but-allowed pins (strapping/UART) are marked
-        // the same way the board diagram marks them.
+        // Options: every GPIO on the current board that's actually valid
+        // for this role's type — same filter (PinValidation.canAssign)
+        // the board-diagram tap flow uses, so the dropdown can never
+        // offer a pin tapping would have rejected. Risky-but-allowed
+        // pins (strapping/UART) are marked the same way the board
+        // diagram marks them. No "Unassigned" entry here — clearing a
+        // pin is the dedicated ✕ button below, not a dropdown choice.
         val board = Boards.byKey(currentBoardKey)
         val options = mutableListOf<Pair<String, Int?>>().apply {
-            add("Unassigned" to null)
+            if (gpio == null) {
+                // Placeholder only shown while nothing is assigned yet —
+                // not a selectable "clear" action, just what the
+                // dropdown displays before a real pin is chosen.
+                add("— Select GPIO —" to null)
+            }
             board.allPins().forEach { pin ->
                 val pinGpio = pin.gpio ?: return@forEach
                 if (PinValidation.canAssign(pin, role.key).ok) {
@@ -513,26 +540,22 @@ class PinMapperActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
-
-        row.addView(nameView)
         row.addView(spinner)
 
-        // Custom roles get a visible delete icon — relying on a hidden
-        // long-press alone made deletion undiscoverable. Built-in roles
-        // stay long-press-to-rename only (they can't be deleted).
-        val isCustom = customRoles.any { it.key == role.key }
-        if (isCustom) {
-            val deleteBtn = TextView(this).apply {
-                text = "🗑"
+        // Dedicated "clear this pin" button — replaces the delete icon's
+        // old spot on the right. Only shown once something's actually
+        // assigned (nothing to clear otherwise).
+        if (gpio != null) {
+            val clearBtn = TextView(this).apply {
+                text = "✕"
                 textSize = 14f
+                setTextColor(Color.parseColor("#8A939C"))
                 setPadding(24, 0, 0, 0)
                 setOnClickListener {
-                    // Don't let this bubble up to the row's own click
-                    // listener (which toggles pin-assignment mode).
-                    showEditRoleDialog(role)
+                    assignGpioToRole(role.key, null)
                 }
             }
-            row.addView(deleteBtn)
+            row.addView(clearBtn)
         }
 
         row.setOnLongClickListener {
