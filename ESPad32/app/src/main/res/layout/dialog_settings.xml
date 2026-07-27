@@ -5,7 +5,7 @@
     android:orientation="vertical"
     android:background="#0A0A0A">
 
-    <!-- Top bar: IP + Joystick toggle + Follow + Track -->
+    <!-- Top bar: IP + Joystick toggle -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:background="#1A1A1A"
         android:padding="10dp" android:gravity="center_vertical">
@@ -32,27 +32,16 @@
             android:layout_marginEnd="16dp"
             style="@style/CarButton"/>
 
-        <!-- Joystick toggle moved right, next to Follow -->
+        <!-- Joystick toggle — Follow/Track (Freenove-specific
+             CMD_CAR_MODE light-follow/line-track sensor modes) removed
+             from here, same reasoning as the main panel cleanup: this
+             sketch has no sensors to back those modes. -->
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:text="Joysticks" android:textColor="#888888"
             android:textSize="10sp" android:layout_marginEnd="6dp"/>
         <Switch android:id="@+id/switchJoysticks"
             android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:thumbTint="#00E5FF" android:trackTint="#333333"
-            android:layout_marginEnd="16dp"/>
-
-        <!-- Follow button -->
-        <Button android:id="@+id/btnFollowTop"
-            android:layout_width="wrap_content" android:layout_height="36dp"
-            android:text="💡 FOLLOW" android:textSize="11sp"
-            android:layout_marginEnd="8dp"
-            style="@style/CarButton"/>
-
-        <!-- Track button -->
-        <Button android:id="@+id/btnTrackTop"
-            android:layout_width="wrap_content" android:layout_height="36dp"
-            android:text="🗺 TRACK" android:textSize="11sp"
-            style="@style/CarButton"/>
+            android:thumbTint="#00E5FF" android:trackTint="#333333"/>
 
     </LinearLayout>
 

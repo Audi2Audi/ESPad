@@ -99,14 +99,6 @@ class SettingsDialogFragment : DialogFragment() {
         val btnSave   = view.findViewById<Button>(R.id.btnSave)
         val btnCancel = view.findViewById<Button>(R.id.btnCancel)
 
-        // Follow / Track buttons in top bar
-        view.findViewById<Button>(R.id.btnFollowTop)?.setOnClickListener {
-            MainTcpHolder.enqueue?.invoke("CMD_CAR_MODE#1\n")
-        }
-        view.findViewById<Button>(R.id.btnTrackTop)?.setOnClickListener {
-            MainTcpHolder.enqueue?.invoke("CMD_CAR_MODE#2\n")
-        }
-
         view.findViewById<Button>(R.id.btnSearchDevices)?.setOnClickListener {
             searchForDevices()
         }
