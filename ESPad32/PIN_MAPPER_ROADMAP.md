@@ -5,6 +5,41 @@ the current two hardcoded profiles (Train, RC Car) on one board (WeMos
 D1 Mini32). Nothing here is committed to — it's a working list to pull
 from when picking the next increment.
 
+## The full-circle test (a concrete "definition of done")
+
+This whole project started by pulling ESPad out of a Freenove-specific
+codebase — stripping their hardcoded LED/horn/camera-servo/matrix-face
+commands out in favor of a generic, user-defined pin-role system. The
+fitting way to prove that generalization actually holds up: once the
+web-based profile creator (see below) and servo support exist, use
+**that** — the fully generic tooling, not any Freenove-specific code —
+to build a profile that recreates the original Freenove 4WD car's
+core R/C functionality from scratch.
+
+**What that test would realistically cover, and what it wouldn't:**
+- ✅ **In scope, achievable with the generic framework:** drive motors
+  (direction + PWM speed — already works), pan/tilt camera servos
+  (needs real servo angle support first — see below, currently only
+  PWM duty exists, not `Servo.attach()`/angle control), a headlight
+  or indicator LED (already works), a horn/buzzer (already works via
+  DIGITAL_OUTPUT or PWM_OUTPUT).
+- ❌ **Likely permanently out of scope, and worth being upfront about
+  that now rather than treating it as a gap to eventually fill:** the
+  WS2812 addressable RGB LED strip (a genuinely different protocol
+  from simple digital/PWM — would need its own dedicated role type and
+  firmware library, not just a pin assignment), the 8x8 dot-matrix
+  face display (specialized addressable hardware, not a simple pin
+  role at all), camera video streaming (a real subsystem tied to the
+  ESP32-CAM module specifically, unrelated to the pin-role framework),
+  and the autonomous light-follow/line-track sensor modes (these need
+  actual programmable *behavior* — "if sensor reads X, drive motor Y" —
+  not just declarative I/O mapping, which is a fundamentally different
+  kind of feature than anything this framework does today).
+
+  The realistic, honest version of "full circle" is recreating the
+  car's **manual driving experience** end to end through generic
+  tools — not literally 100% of the original firmware's feature set.
+
 ## Status: done so far
 
 - [x] **Export/import a full device profile.** Long-press any device
