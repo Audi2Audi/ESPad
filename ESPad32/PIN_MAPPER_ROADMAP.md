@@ -55,11 +55,14 @@ core R/C functionality from scratch.
         assignable in Pin Mapper, same mechanism, new use.
       - `MainActivity`'s Photo/Record buttons (both the control-panel
         drawer versions and the overlay-stack versions — there were two
-        separate copies) now hide entirely unless the *active profile's
-        board* actually supports a camera, checked on load and resume.
-        Previously always shown regardless of device — a leftover
-        assumption from when this app only ever talked to the Freenove
-        car.
+        separate copies) **and Camera Flip** now hide entirely unless
+        the *active profile's board* actually supports a camera,
+        checked on load and resume. Previously always shown regardless
+        of device — a leftover assumption from when this app only ever
+        talked to the Freenove car. (Camera Flip was missed in the
+        first pass — it survived the earlier Freenove-cleanup work
+        since it's local-only with no device command involved, but it's
+        still meaningless without an actual camera feed to flip.)
       **Firmware side deliberately deferred, per explicit agreement:**
       this only addresses the app-side "should this UI even appear"
       question. Actual camera driver init (`esp_camera_init()`) and an

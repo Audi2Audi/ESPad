@@ -796,7 +796,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // profile (see ActiveProfile.kt for what that means and its
     // limitations). Local-only, same as the Controls screen itself —
     // tapping flips stored state and does not talk to the ESP32 yet.
-    // Photo/Record only make sense on a board that actually has a
+    // Photo/Record/Flip only make sense on a board that actually has a
     // camera — previously always shown, a leftover from when this app
     // only ever talked to the Freenove car. A camera isn't something a
     // pin role can express (fixed wiring, not a user-assignable
@@ -812,6 +812,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val visibility = if (hasCamera) android.view.View.VISIBLE else android.view.View.GONE
         findViewById<android.view.View>(R.id.btnPhoto)?.visibility = visibility
         findViewById<android.view.View>(R.id.btnRecord)?.visibility = visibility
+        findViewById<android.view.View>(R.id.btnCameraFlip)?.visibility = visibility
         findViewById<android.view.View>(R.id.btnPhotoOverlay)?.visibility = visibility
         findViewById<android.view.View>(R.id.btnRecordOverlay)?.visibility = visibility
     }
