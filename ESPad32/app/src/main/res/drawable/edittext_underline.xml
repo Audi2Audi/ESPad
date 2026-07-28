@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    edittext_underline.xml
+
+    A flat, minimal alternative to a solid filled box background for
+    text inputs — pushes the shape's top/left/right edges outside the
+    view's visible bounds (negative insets), leaving only the bottom
+    edge showing as a thin line.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="-6dp" android:left="-6dp" android:right="-6dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent"/>
+            <stroke android:width="1.5dp" android:color="#3A3A3A"/>
+        </shape>
+    </item>
+</layer-list>

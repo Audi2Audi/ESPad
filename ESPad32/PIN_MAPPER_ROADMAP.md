@@ -42,6 +42,34 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Removed the Settings dialog's Save/Close buttons — they were
+      already functionally redundant with each other and with simply
+      closing the dialog.** Investigation before touching anything:
+      "Close" was actually wired as Cancel-then-dismiss, and
+      `onDismiss()` already had its own inline fallback that
+      auto-persisted everything (theme, joystick toggle, controller
+      sensitivity sliders) if the explicit Save button hadn't been
+      tapped first. Since `onDismiss()` fires on every close path
+      (button tap, back gesture, or tapping outside) uniformly, Save
+      and Close were doing the exact same thing via two different code
+      paths — there was no actual "discard changes" behavior working
+      at all. Consolidated the duplicated save logic into one shared
+      `persistSettings()` method (previously existed as two nearly-
+      identical inline copies) and removed both buttons entirely —
+      closing the dialog any way still saves everything, same as
+      before, just without the redundant explicit step.
+      Also de-emphasized "Forget" (clears saved WiFi credentials) from
+      a boxed button matching Connect's visual weight to a plain
+      text-style action — it's a rarer, semi-destructive action and
+      shouldn't visually compete with Connect, the thing people
+      actually tap most of the time. Flattened the IP/SSID/Password
+      fields from solid filled boxes to a thin underline style
+      (`edittext_underline.xml`) — a first pass at the "flatten the
+      appearance" ask, scoped to what was actually visible in the
+      screenshot; the same treatment could extend to the Theme/
+      Controller/OTA tabs later if wanted.
+
+
 - [x] **Removed the "Pin Ref" tab from Controller Mapping entirely —
       not made conditional, actually removed.** This was a static
       reference table describing the *original* Freenove car's

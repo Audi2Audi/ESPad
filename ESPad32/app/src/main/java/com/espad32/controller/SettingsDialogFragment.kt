@@ -96,35 +96,37 @@ class SettingsDialogFragment : DialogFragment() {
         tabController?.setOnClickListener { showTab(2) }
         tabOta?.setOnClickListener        { showTab(3) }
 
-        val btnSave   = view.findViewById<Button>(R.id.btnSave)
-        val btnCancel = view.findViewById<Button>(R.id.btnCancel)
-
         view.findViewById<Button>(R.id.btnSearchDevices)?.setOnClickListener {
             searchForDevices()
         }
 
-        fun doSave() {
-            val theme = when (rgTheme?.checkedRadioButtonId) {
-                R.id.rbMinimal -> PanelTheme.MINIMAL_FLAT
-                R.id.rbHud     -> PanelTheme.TACTICAL_HUD
-                else           -> PanelTheme.DARK_GLASS
-            }
-            ThemeManager.save(requireContext(), theme)
-            onSave?.invoke(
-                etIp?.text.toString().trim(),
-                switchJoysticks?.isChecked ?: false,
-                sliderToServoStep((sbG8Servo?.progress ?: 4) + 1),
-                sliderToMotorScale((sbG8Motor?.progress ?: 4) + 1),
-                sliderToServoStep((sbOsServo?.progress ?: 2) + 1),
-                sliderToMotorScale((sbOsMotor?.progress ?: 2) + 1)
-            )
-            saved = true
-        }
-
-        btnSave.setOnClickListener { doSave(); dismiss() }
-        btnCancel.setOnClickListener { dismiss() }
-
         showTab(0)
+    }
+
+    // Was previously only triggered by an explicit "Save" button; now
+    // called automatically whenever a setting actually changes (see the
+    // listeners wired in buildThemeTab/buildControllerTab), so there's
+    // no "unsaved changes" state left for a Save/Cancel button pair to
+    // manage — closing the dialog any way (back gesture, tap outside)
+    // was already safe before this change too, since onDismiss() below
+    // called an identical inline copy of this same logic as a fallback.
+    // Consolidated into one shared method instead of two copies.
+    private fun persistSettings() {
+        val theme = when (rgTheme?.checkedRadioButtonId) {
+            R.id.rbMinimal -> PanelTheme.MINIMAL_FLAT
+            R.id.rbHud     -> PanelTheme.TACTICAL_HUD
+            else           -> PanelTheme.DARK_GLASS
+        }
+        ThemeManager.save(requireContext(), theme)
+        onSave?.invoke(
+            etIp?.text.toString().trim(),
+            switchJoysticks?.isChecked ?: false,
+            sliderToServoStep((sbG8Servo?.progress ?: 4) + 1),
+            sliderToMotorScale((sbG8Motor?.progress ?: 4) + 1),
+            sliderToServoStep((sbOsServo?.progress ?: 2) + 1),
+            sliderToMotorScale((sbOsMotor?.progress ?: 2) + 1)
+        )
+        saved = true
     }
 
     private fun showTab(tab: Int) {
@@ -247,7 +249,7 @@ class SettingsDialogFragment : DialogFragment() {
             hint = "Tap to scan  •  Long-press to type"
             inputType = android.text.InputType.TYPE_NULL  // prevents keyboard on tap; long-press re-enables
             setTextColor(0xFFFFFFFF.toInt()); setHintTextColor(0xFF555555.toInt())
-            setBackgroundColor(0xFF2A2A2A.toInt()); setPadding(12, 12, 12, 12)
+            setBackgroundResource(R.drawable.edittext_underline); setPadding(12, 12, 12, 12)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         val btnConnect = Button(requireContext()).apply {
@@ -364,7 +366,7 @@ class SettingsDialogFragment : DialogFragment() {
         // Password row with eye toggle and Forget button inline
         val passRow2 = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(0xFF2A2A2A.toInt())
+            setBackgroundResource(R.drawable.edittext_underline)
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 16.dp }
         }
@@ -383,12 +385,17 @@ class SettingsDialogFragment : DialogFragment() {
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
         }
+        // Deliberately NOT styled like Connect (no boxed background,
+        // smaller) — Forget is a rare, semi-destructive action (clears
+        // saved WiFi credentials) and shouldn't visually compete with
+        // Connect, the action people actually use most of the time.
         val btnForget = Button(requireContext()).apply {
-            text = "Forget"; textSize = 11f; isAllCaps = false
-            setBackgroundResource(R.drawable.btn_car_bg); setTextColor(0xFFFF6644.toInt())
+            text = "Forget"; textSize = 10.5f; isAllCaps = false
+            setBackgroundColor(0x00000000); setTextColor(0xFFAA5540.toInt())
+            setPadding(12.dp, 0, 4.dp, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                marginStart = 8.dp; gravity = android.view.Gravity.CENTER_VERTICAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
             }
         }
         passRow2.addView(etWifiPass); passRow2.addView(btnToggle); passRow2.addView(btnForget)
@@ -898,20 +905,7 @@ class SettingsDialogFragment : DialogFragment() {
     override fun onDismiss(dialog: android.content.DialogInterface) {
         if (!saved) {
             try {
-                val theme = when (rgTheme?.checkedRadioButtonId) {
-                    R.id.rbMinimal -> PanelTheme.MINIMAL_FLAT
-                    R.id.rbHud     -> PanelTheme.TACTICAL_HUD
-                    else           -> PanelTheme.DARK_GLASS
-                }
-                ThemeManager.save(requireContext(), theme)
-                onSave?.invoke(
-                    etIp?.text.toString().trim(),
-                    switchJoysticks?.isChecked ?: false,
-                    sliderToServoStep((sbG8Servo?.progress ?: 4) + 1),
-                    sliderToMotorScale((sbG8Motor?.progress ?: 4) + 1),
-                    sliderToServoStep((sbOsServo?.progress ?: 2) + 1),
-                    sliderToMotorScale((sbOsMotor?.progress ?: 2) + 1)
-                )
+                persistSettings()
             } catch (e: Exception) { }
         }
         MainTcpHolder.onNextData = null
