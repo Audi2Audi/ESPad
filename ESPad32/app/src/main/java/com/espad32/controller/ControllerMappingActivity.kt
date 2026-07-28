@@ -12,7 +12,6 @@ class ControllerMappingActivity : AppCompatActivity() {
     private lateinit var tabButtons: TextView
     private lateinit var tabAxes: TextView
     private lateinit var tabAdvanced: TextView
-    private lateinit var tabPinRef: TextView
     private lateinit var contentArea: LinearLayout
 
     // For detect-button dialog
@@ -27,14 +26,12 @@ class ControllerMappingActivity : AppCompatActivity() {
         tabButtons  = findViewById(R.id.tabButtons)
         tabAxes     = findViewById(R.id.tabAxes)
         tabAdvanced = findViewById(R.id.tabAdvanced)
-        tabPinRef   = findViewById(R.id.tabPinRef)
         contentArea = findViewById(R.id.mappingContent)
 
         tabPresets.setOnClickListener  { showTab(0) }
         tabButtons.setOnClickListener  { showTab(1) }
         tabAxes.setOnClickListener     { showTab(2) }
         tabAdvanced.setOnClickListener { showTab(3) }
-        tabPinRef.setOnClickListener   { showTab(4) }
 
         findViewById<Button>(R.id.btnMappingClose).setOnClickListener { finish() }
 
@@ -44,7 +41,7 @@ class ControllerMappingActivity : AppCompatActivity() {
     private fun showTab(tab: Int) {
         val cyan = getColor(android.R.color.holo_blue_light)
         val grey = 0xFF888888.toInt()
-        listOf(tabPresets, tabButtons, tabAxes, tabAdvanced, tabPinRef)
+        listOf(tabPresets, tabButtons, tabAxes, tabAdvanced)
             .forEachIndexed { i, tv -> tv.setTextColor(if (i == tab) cyan else grey) }
         contentArea.removeAllViews()
         when (tab) {
@@ -52,7 +49,6 @@ class ControllerMappingActivity : AppCompatActivity() {
             1 -> buildButtonsTab()
             2 -> buildAxesTab()
             3 -> buildAdvancedTab()
-            4 -> buildPinRefTab()
         }
     }
 
@@ -391,52 +387,6 @@ class ControllerMappingActivity : AppCompatActivity() {
         }.also { contentArea.addView(it) }
     }
 
-    // ── Pin Reference tab ─────────────────────────────────────────────
-    private fun buildPinRefTab() {
-        addSectionHeader("I²C BUS (PCA9685 + LED Matrix)")
-        pinRow("SDA", "GPIO 13", "Servo driver + LED matrix data")
-        pinRow("SCL", "GPIO 14", "Servo driver + LED matrix clock")
-        pinRow("PCA9685 Address", "0x5F", "Servo / motor PWM driver")
-        pinRow("VK16K33 Address", "0x71", "Dual 8×8 LED matrix")
-        addDivider()
-        addSectionHeader("SERVO (via PCA9685)")
-        pinRow("Pan Servo",  "PCA9685 Ch 0", "Camera pan (servo 1)")
-        pinRow("Tilt Servo", "PCA9685 Ch 1", "Camera tilt (servo 2)")
-        addDivider()
-        addSectionHeader("MOTORS (via PCA9685)")
-        pinRow("M1 IN1 / IN2", "Ch 15 / 14", "Front-left motor")
-        pinRow("M2 IN1 / IN2", "Ch 9 / 8",   "Front-right motor")
-        pinRow("M3 IN1 / IN2", "Ch 12 / 13", "Rear-left motor")
-        pinRow("M4 IN1 / IN2", "Ch 10 / 11", "Rear-right motor")
-        addDivider()
-        addSectionHeader("DIRECT GPIO")
-        pinRow("WS2812 LEDs", "GPIO 32", "RGB LED strip data")
-        pinRow("Buzzer",      "GPIO 2",  "Active buzzer / horn")
-        pinRow("Battery ADC", "GPIO 32", "Voltage divider input")
-        pinRow("PCF8574 SDA", "GPIO 13", "Line tracker I²C data")
-        pinRow("PCF8574 SCL", "GPIO 14", "Line tracker I²C clock")
-        addDivider()
-        addSectionHeader("OV2640 CAMERA")
-        pinRow("XCLK",   "GPIO 21", "Camera clock")
-        pinRow("SIOD",   "GPIO 26", "SCCB data")
-        pinRow("SIOC",   "GPIO 27", "SCCB clock")
-        pinRow("VSYNC",  "GPIO 25", "Vertical sync")
-        pinRow("HREF",   "GPIO 23", "Horizontal reference")
-        pinRow("PCLK",   "GPIO 22", "Pixel clock")
-        pinRow("Y9..Y2", "35,34,39,36,19,18,5,4", "Pixel data bus")
-        addDivider()
-        addSectionHeader("WiFi / TCP")
-        pinRow("AP SSID",     "ESPad_32",     "Access point name")
-        pinRow("AP Password", "ESPad_32",     "Access point password")
-        pinRow("AP IP",       "192.168.4.1", "Default app IP")
-        pinRow("Cmd Port",    "4000",        "Command socket")
-        pinRow("Camera Port", "7000",        "Camera stream socket")
-        contentArea.addView(TextView(this).apply {
-            text = "ℹ  Read-only. Reflects current sketch header definitions."
-            textSize = 10f; setTextColor(0xFF555555.toInt()); setPadding(0,16,0,0)
-        })
-    }
-
     // ── Shared helpers ────────────────────────────────────────────────
     private fun addSliderPref(prefs: android.content.SharedPreferences, key: String,
                                label: String, default: Int, min: Int, max: Int, scale: Float) {
@@ -511,28 +461,6 @@ class ControllerMappingActivity : AppCompatActivity() {
             gravity = android.view.Gravity.END
         }
         row.addView(tvVal); contentArea.addView(row); return tvVal
-    }
-    private fun pinRow(label: String, pin: String, description: String) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(0xFF1A1A1A.toInt()); setPadding(12, 10, 12, 10)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 3.dp }
-        }
-        row.addView(TextView(this).apply {
-            text = label; textSize = 12f; setTextColor(0xFFCCCCCC.toInt())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.2f)
-        })
-        row.addView(TextView(this).apply {
-            text = pin; textSize = 12f; setTextColor(0xFF00E5FF.toInt())
-            typeface = android.graphics.Typeface.MONOSPACE
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        row.addView(TextView(this).apply {
-            text = description; textSize = 11f; setTextColor(0xFF666666.toInt())
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.8f)
-        })
-        contentArea.addView(row)
     }
     private val timeoutValues = listOf(0,200,500,1000,2000,3000,5000,10000,20000,30000,60000)
     private fun sliderToTimeout(v: Int) = timeoutValues.getOrElse(v) { 500 }

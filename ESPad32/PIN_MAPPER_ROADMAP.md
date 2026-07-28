@@ -42,6 +42,32 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Removed the "Pin Ref" tab from Controller Mapping entirely —
+      not made conditional, actually removed.** This was a static
+      reference table describing the *original* Freenove car's
+      specific ancillary hardware (a PCA9685 servo/motor PWM driver, a
+      VK16K33 dual 8×8 LED matrix, an OV2640 camera module's exact
+      pinout, a PCF8574-based line tracker) — hardcoded GPIO/I²C-address
+      documentation that doesn't correspond to anything in this app's
+      generic pin-role framework at all. Unlike Photo/Record/Flip
+      (genuinely conditional on `BoardDef.supportsCamera`), there was
+      no real board or profile this content could ever apply to — it
+      wasn't a "hide unless relevant" case, it was pure dead
+      documentation for hardware this app no longer targets. Some of
+      it wasn't even accurate anymore either (listed AP password and
+      camera port didn't match this project's actual values). Removed
+      the tab, its dispatch case, and the `pinRow()` helper exclusively
+      used by it; kept `addSectionHeader()`/`addDivider()` since the
+      Advanced tab still uses those.
+      **Also found and removed:** the actual compiled Freenove firmware
+      binary (`06_3_Multi_Functional_Car.ino.bin`, ~1.1MB) was still
+      physically sitting in `app/src/main/assets/` — dead weight
+      bloating the APK, unused since the code was already renamed to
+      look for `espad_default_firmware.bin` instead. The earlier
+      filename fix only updated the code references; the actual old
+      file itself had been missed.
+
+
 - [x] **Camera support handled as a board property, not a pin role.**
       A camera can't be expressed as "assign this GPIO to a function"
       the way everything else in this framework works — it's a

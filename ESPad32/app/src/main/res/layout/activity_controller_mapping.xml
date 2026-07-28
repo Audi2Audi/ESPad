@@ -40,11 +40,6 @@
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:text="⚙ Advanced" android:textSize="13sp" android:gravity="center"
                 android:padding="12dp" android:textColor="#888888"/>
-            <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#333333"/>
-            <TextView android:id="@+id/tabPinRef"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="📌 Pin Ref" android:textSize="13sp" android:gravity="center"
-                android:padding="12dp" android:textColor="#888888"/>
         </LinearLayout>
     </HorizontalScrollView>
 
