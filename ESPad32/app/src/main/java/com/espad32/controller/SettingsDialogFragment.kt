@@ -20,7 +20,7 @@ import androidx.fragment.app.DialogFragment
 
 class SettingsDialogFragment : DialogFragment() {
 
-    var onSave: ((ip: String, joysticks: Boolean,
+    var onSave: ((ip: String, joysticks: Boolean, virtualButtons: Boolean,
                   g8Servo: Float, g8Motor: Float,
                   osServo: Float, osMotor: Float) -> Unit)? = null
 
@@ -31,14 +31,15 @@ class SettingsDialogFragment : DialogFragment() {
         private const val OS_MOTOR_DEFAULT  = 3
 
         fun newInstance(
-            ip: String, joysticks: Boolean,
+            ip: String, joysticks: Boolean, virtualButtons: Boolean,
             g8Servo: Float, g8Motor: Float,
             osServo: Float, osMotor: Float,
-            onSave: (String, Boolean, Float, Float, Float, Float) -> Unit
+            onSave: (String, Boolean, Boolean, Float, Float, Float, Float) -> Unit
         ) = SettingsDialogFragment().apply {
             arguments = Bundle().apply {
                 putString("ip", ip)
                 putBoolean("joysticks", joysticks)
+                putBoolean("virtualButtons", virtualButtons)
                 putInt("g8ServoSlider",  servoStepToSlider(g8Servo))
                 putInt("g8MotorSlider",  motorScaleToSlider(g8Motor))
                 putInt("osServoSlider",  servoStepToSlider(osServo))
@@ -57,6 +58,7 @@ class SettingsDialogFragment : DialogFragment() {
     private var saved = false
     private var etIp: EditText? = null
     private var switchJoysticks: Switch? = null
+    private var switchVirtualButtons: Switch? = null
     private var sbG8Servo: SeekBar? = null
     private var sbG8Motor: SeekBar? = null
     private var sbOsServo: SeekBar? = null
@@ -87,6 +89,7 @@ class SettingsDialogFragment : DialogFragment() {
 
         etIp            = view.findViewById(R.id.etIpAddress)
         switchJoysticks = view.findViewById(R.id.switchJoysticks)
+        switchVirtualButtons = view.findViewById(R.id.switchVirtualButtons)
         contentArea     = view.findViewById(R.id.settingsContent)
         tabWifi         = view.findViewById(R.id.tabWifi)
         tabTheme        = view.findViewById(R.id.tabTheme)
@@ -95,6 +98,7 @@ class SettingsDialogFragment : DialogFragment() {
 
         etIp?.setText(args.getString("ip"))
         switchJoysticks?.isChecked = args.getBoolean("joysticks")
+        switchVirtualButtons?.isChecked = args.getBoolean("virtualButtons")
 
         tabWifi?.setOnClickListener       { showTab(0) }
         tabTheme?.setOnClickListener      { showTab(1) }
@@ -128,6 +132,7 @@ class SettingsDialogFragment : DialogFragment() {
         onSave?.invoke(
             etIp?.text.toString().trim(),
             switchJoysticks?.isChecked ?: false,
+            switchVirtualButtons?.isChecked ?: false,
             sliderToServoStep((sbG8Servo?.progress ?: 4) + 1),
             sliderToMotorScale((sbG8Motor?.progress ?: 4) + 1),
             sliderToServoStep((sbOsServo?.progress ?: 2) + 1),

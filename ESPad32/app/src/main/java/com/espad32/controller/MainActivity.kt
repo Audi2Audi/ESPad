@@ -84,6 +84,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var currentLedMode     = 0
     private var currentEmotionMode = 0
     private var joysticksEnabled   = false
+    private var virtualButtonsEnabled = false
     private var speedCurveExpo    = false
     private var autoStopMs        = 500
     private val PREFS_NAME = "ESPad32Prefs"
@@ -116,6 +117,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         carIp          = prefs.getString("ip", "192.168.4.1") ?: "192.168.4.1"
         joysticksEnabled = prefs.getBoolean("joysticks", false)
+        virtualButtonsEnabled = prefs.getBoolean("virtual_buttons", false)
         g8ServoStep    = prefs.getFloat("g8ServoStep",  8.0f)
         g8MotorScale   = prefs.getFloat("g8MotorScale", 1.0f)
         osServoStep    = prefs.getFloat("osServoStep",  4.0f)
@@ -152,6 +154,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         surfaceView.holder.addCallback(this)
         setupJoysticks()
         applyJoystickVisibility()
+        applyVirtualButtonsVisibility()
         renderLiveButtons()
         updateCameraUiVisibility()
         val cameraControls = findViewById<android.view.ViewGroup>(R.id.cameraControls)
@@ -589,19 +592,36 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (event.repeatCount > 0) return super.onKeyDown(keyCode, event)
         if (!isGamepad(event)) return super.onKeyDown(keyCode, event)
-        executeButtonFunction(keyCode, true)
+        handleGamepadButtonEvent(keyCode, true)
         return true
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (!isGamepad(event)) return super.onKeyUp(keyCode, event)
-        val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
-        when (mapping?.function) {
-            ButtonFunction.HORN_ON -> enqueue("CMD_BUZZER#0#2000\n")
-            ButtonFunction.CUSTOM_CONTROL -> executeCustomControlButton(mapping.customButtonId, pressed = false)
-            else -> {}
-        }
+        handleGamepadButtonEvent(keyCode, false)
         return true
+    }
+
+    // Single shared dispatch for "this physical-gamepad-button keyCode
+    // was pressed or released" — used by real onKeyDown/onKeyUp AND by
+    // the on-screen virtual gamepad buttons, so whatever's mapped via
+    // Controller Mapping behaves identically either way. On press, runs
+    // the full ButtonFunction dispatch. On release, only the cases that
+    // actually need a release event act (horn, CUSTOM_CONTROL) — every
+    // other legacy function only ever reacted to press and shouldn't
+    // start firing twice just because release events now flow through
+    // here too.
+    private fun handleGamepadButtonEvent(keyCode: Int, pressed: Boolean) {
+        if (pressed) {
+            executeButtonFunction(keyCode, true)
+        } else {
+            val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
+            when (mapping?.function) {
+                ButtonFunction.HORN_ON -> enqueue("CMD_BUZZER#0#2000\n")
+                ButtonFunction.CUSTOM_CONTROL -> executeCustomControlButton(mapping.customButtonId, pressed = false)
+                else -> {}
+            }
+        }
     }
 
     private fun executeButtonFunction(keyCode: Int, isPress: Boolean) {
@@ -732,6 +752,105 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         joystickRight.visibility = vis
     }
 
+    private fun applyVirtualButtonsVisibility() {
+        val container = findViewById<android.view.View>(R.id.virtualButtonsContainer) ?: return
+        if (virtualButtonsEnabled) {
+            container.visibility = android.view.View.VISIBLE
+            renderVirtualButtons()
+        } else {
+            container.visibility = android.view.View.GONE
+        }
+    }
+
+    // On-screen equivalents of the 12 physical gamepad buttons
+    // ControllerMapping already knows about (see ALL_BUTTONS) — tapping
+    // one calls the exact same handleGamepadButtonEvent() a real
+    // gamepad's KeyEvent would, so whatever's mapped via Controller
+    // Mapping works identically either way, and the app can be fully
+    // driven without ever owning a physical gamepad.
+    private fun renderVirtualButtons() {
+        val container = findViewById<LinearLayout>(R.id.virtualButtonsContainer) ?: return
+        container.removeAllViews()
+
+        val perRow = 4
+        var rowLayout: LinearLayout? = null
+
+        ControllerMapping.buttons.forEachIndexed { index, mapping ->
+            if (index % perRow == 0) {
+                rowLayout = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = dp(4) }
+                }
+                container.addView(rowLayout)
+            }
+
+            val shortLabel = shortLabelForKeyCode(mapping.keyCode)
+            val targetLabel = resolveVirtualButtonTarget(mapping)
+
+            val btnView = Button(this).apply {
+                text = if (targetLabel != null) "$shortLabel\n$targetLabel" else shortLabel
+                textSize = 9f
+                isAllCaps = false
+                minWidth = 0
+                minimumWidth = 0
+                setPadding(6, 4, 6, 4)
+                alpha = 0.82f
+                setBackgroundColor(Color.parseColor("#33FFFFFF"))
+                setTextColor(Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(dp(58), dp(40)).apply { marginEnd = dp(4) }
+            }
+            btnView.setOnTouchListener { v, event ->
+                when (event.action) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        handleGamepadButtonEvent(mapping.keyCode, true)
+                        v.alpha = 1f
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        handleGamepadButtonEvent(mapping.keyCode, false)
+                        v.alpha = 0.82f
+                        true
+                    }
+                    else -> false
+                }
+            }
+            rowLayout?.addView(btnView)
+        }
+    }
+
+    private fun shortLabelForKeyCode(keyCode: Int): String = when (keyCode) {
+        KeyEvent.KEYCODE_BUTTON_A -> "A"
+        KeyEvent.KEYCODE_BUTTON_B -> "B"
+        KeyEvent.KEYCODE_BUTTON_X -> "X"
+        KeyEvent.KEYCODE_BUTTON_Y -> "Y"
+        KeyEvent.KEYCODE_BUTTON_L1 -> "L1"
+        KeyEvent.KEYCODE_BUTTON_R1 -> "R1"
+        KeyEvent.KEYCODE_BUTTON_L2 -> "L2"
+        KeyEvent.KEYCODE_BUTTON_R2 -> "R2"
+        KeyEvent.KEYCODE_BUTTON_THUMBL -> "L3"
+        KeyEvent.KEYCODE_BUTTON_THUMBR -> "R3"
+        KeyEvent.KEYCODE_BUTTON_START -> "Start"
+        KeyEvent.KEYCODE_BUTTON_SELECT -> "Select"
+        else -> "?"
+    }
+
+    // Shows what a button is actually mapped to right now (resolving
+    // CUSTOM_CONTROL to the real Controls button's label), not just the
+    // raw physical button name — otherwise someone using this without a
+    // gamepad at all would see "A"/"B"/"X" with no idea what they do.
+    private fun resolveVirtualButtonTarget(mapping: ButtonMapping): String? {
+        return when (mapping.function) {
+            ButtonFunction.CUSTOM_CONTROL -> {
+                val profileKey = com.espad32.controller.controls.ActiveProfile.get(this, Profiles.TRAIN.key)
+                controlButtonStorage.loadButtons(profileKey).find { it.id == mapping.customButtonId }?.label
+            }
+            ButtonFunction.NONE -> null
+            else -> mapping.function.label
+        }
+    }
+
     // ── Photo / Video ─────────────────────────────────────────────────
     private fun takePhoto() {
         val bitmap = cameraStream?.currentBitmap
@@ -769,14 +888,15 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // ── Settings ──────────────────────────────────────────────────────
     private fun showSettings() {
         SettingsDialogFragment.newInstance(
-            carIp, joysticksEnabled,
+            carIp, joysticksEnabled, virtualButtonsEnabled,
             g8ServoStep, g8MotorScale,
             osServoStep, osMotorScale
-        ) { newIp, newJoysticks, newG8Servo, newG8Motor, newOsServo, newOsMotor ->
+        ) { newIp, newJoysticks, newVirtualButtons, newG8Servo, newG8Motor, newOsServo, newOsMotor ->
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             prefs.edit()
                 .putString("ip", newIp)
                 .putBoolean("joysticks", newJoysticks)
+                .putBoolean("virtual_buttons", newVirtualButtons)
                 .putFloat("g8ServoStep",  newG8Servo)
                 .putFloat("g8MotorScale", newG8Motor)
                 .putFloat("osServoStep",  newOsServo)
@@ -787,7 +907,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             speedCurveExpo = prefs.getString("speedCurve","linear") == "exponential"
             autoStopMs     = prefs.getInt("autoStopMs", 500)
             joysticksEnabled = newJoysticks
+            virtualButtonsEnabled = newVirtualButtons
             applyJoystickVisibility()
+            applyVirtualButtonsVisibility()
             setupJoysticks()
             ThemeManager.apply(controlPanelView)
             if (newIp != carIp) {
@@ -998,6 +1120,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         // Pin Mapper or Controls screen while we were away.
         renderLiveButtons()
         updateCameraUiVisibility()
+        if (virtualButtonsEnabled) renderVirtualButtons()
     }
 
     override fun onDestroy() {

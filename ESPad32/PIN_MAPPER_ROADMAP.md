@@ -42,6 +42,41 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **On-screen virtual gamepad buttons** — the app can now be fully
+      used without a physical gamepad, joysticks (already existed) plus
+      buttons (new). Deliberately plugs into the *existing* gamepad
+      mapping system rather than building a parallel one: tapping a
+      virtual button calls the exact same dispatch path a real
+      controller's `KeyEvent` would (`handleGamepadButtonEvent()`,
+      extracted from what was separate `onKeyDown`/`onKeyUp` logic), so
+      whatever's mapped via Controller Mapping — `CUSTOM_CONTROL` to a
+      Controls button, or a legacy function — works identically whether
+      triggered by a real gamepad or an on-screen tap.
+      - Toggle in Settings ("Buttons," next to the existing "Joysticks"
+        toggle), same persistence pattern (`SharedPreferences` boolean).
+        Required extending `SettingsDialogFragment`'s `onSave` callback
+        signature (threaded through `newInstance` and its consumption
+        in `MainActivity.showSettings()`).
+      - Renders all 12 physical buttons `ControllerMapping.ALL_BUTTONS`
+        already knows about (A/B/X/Y, L1/R1/L2/R2, stick clicks, Start/
+        Select) as a compact 4-per-row grid, centered between the two
+        joysticks, above the control panel.
+      - **Labels show what's actually mapped**, not just raw button
+        names — a `CUSTOM_CONTROL` button resolves to the real Controls
+        button's label (e.g. shows "LED" under "A"), so someone using
+        this without ever touching a physical gamepad can tell what
+        each button does, not just see cryptic "A"/"B"/"X" labels.
+      - Real press/release via `OnTouchListener` (not tap), matching the
+        momentary-button fix from the same session — consistent
+        behavior whether it's a MOMENTARY-mapped custom function or the
+        legacy horn.
+      **No D-pad** — `ALL_BUTTONS` doesn't include discrete D-pad
+      entries (handled as axes/hat input on real controllers, not
+      separate `KeyEvent`s in this system), so the virtual overlay
+      matches exactly what's already mappable — not a scope expansion
+      beyond what Controller Mapping already supports.
+
+
 - [x] **Momentary buttons now have real press/release**, not just a
       tap. Fixed in all three places momentary control lives: the
       Controls screen's own button row, the main screen's live panel,

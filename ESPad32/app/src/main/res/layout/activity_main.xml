@@ -159,6 +159,20 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/controlPanel"/>
 
+    <!-- On-screen gamepad buttons — centered between the two joysticks,
+         so the app can be fully used without a physical gamepad. Toggled
+         via Settings > Buttons, same pattern as the Joysticks toggle. -->
+    <LinearLayout
+        android:id="@+id/virtualButtonsContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginBottom="24dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/controlPanel"/>
+
     <!-- Camera + settings overlay — bottom right, shown when menu hidden, fades with menu -->
     <LinearLayout
         android:id="@+id/cameraControls"
