@@ -71,6 +71,10 @@
             android:label="Pin Mapper" />
 
         <activity
+            android:name=".pinmapper.DeviceWizardActivity"
+            android:label="Guided Device Setup" />
+
+        <activity
             android:name=".controls.ControlsActivity"
             android:label="Controls" />
 

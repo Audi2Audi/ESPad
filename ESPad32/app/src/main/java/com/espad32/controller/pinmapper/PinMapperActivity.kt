@@ -67,6 +67,14 @@ class PinMapperActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Refresh the device tabs — a device may have been created via
+        // the Guided Setup wizard (a separate Activity) since this
+        // screen was last shown.
+        buildProfileTabs()
+    }
+
     private fun buildProfileTabs() {
         profileTabContainer.removeAllViews()
         ProfileResolver.allProfiles(this).forEach { profile ->
@@ -114,6 +122,30 @@ class PinMapperActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(40, 24, 40, 0)
         }
+
+        // Guided setup — board → functions → pins → buttons as one
+        // continuous flow, for anyone who'd rather not already know
+        // to visit Pin Mapper then Controls separately.
+        val guidedBtn = Button(this).apply {
+            text = "🧭  Guided Setup (recommended)"
+            textSize = 12f
+            isAllCaps = false
+            setBackgroundResource(R.drawable.btn_car_bg)
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 44.dp).apply {
+                bottomMargin = 8.dp
+            }
+        }
+        container.addView(guidedBtn)
+
+        container.addView(TextView(this).apply {
+            text = "— or set up quickly below —"
+            setTextColor(Color.parseColor("#5F6A73"))
+            textSize = 11f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, 4, 0, 16)
+        })
+
         val nameInput = EditText(this).apply { hint = "Device name (e.g. Lamp)" }
         container.addView(nameInput)
 
@@ -185,6 +217,11 @@ class PinMapperActivity : AppCompatActivity() {
             } else {
                 log("Import failed: ${result.error}")
             }
+        }
+
+        guidedBtn.setOnClickListener {
+            dialog.dismiss()
+            startActivity(android.content.Intent(this, DeviceWizardActivity::class.java))
         }
 
         dialog.show()

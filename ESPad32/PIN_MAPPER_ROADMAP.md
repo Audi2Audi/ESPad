@@ -42,6 +42,41 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Guided Device Setup wizard** — board → functions → pins →
+      buttons as one continuous flow, instead of needing to already
+      know to visit Pin Mapper then Controls separately. New
+      `DeviceWizardActivity`, reachable via a "🧭 Guided Setup
+      (recommended)" button at the top of Pin Mapper's existing "+ New
+      Device" dialog (the quick name/board form and paste-import stay
+      available right below it — this adds a path, doesn't remove the
+      others).
+      Deliberately reuses every existing storage/validation class
+      rather than reimplementing anything — `CustomProfileStorage`,
+      `CustomRoleStorage`, `PinConfigStorage`, `ControlButtonStorage`,
+      `PinValidation` — just walks through them in one sequence:
+      1. Name the device, pick its board
+      2. Add functions one at a time (name, type: On/Off/PWM/Analog
+         In) — **the pin is assigned in the same step**, not
+         separately afterward like Pin Mapper does normally, since
+         fewer round-trips is the whole point of this flow. Pin
+         choices are filtered live through the same
+         `PinValidation.canAssign()` (and ADC1-only-for-analog)
+         logic Pin Mapper's own dropdown uses, and already-used pins
+         within the session are excluded automatically.
+      3. For each function just added, offers to create a matching
+         Controls button (Toggle/Momentary for digital, auto-slider
+         for PWM, skipped entirely for Analog In — a reading, not
+         something to control) — skippable per-function, not
+         all-or-nothing.
+      4. Summary screen, with a "Use \\"X\\" Now" button that sets it as
+         the active profile and jumps straight to the main driving
+         screen.
+      Also added `PinMapperActivity.onResume()` (didn't exist before) to
+      refresh its device tabs — needed now that a device can be created
+      from a separate Activity (the wizard) while Pin Mapper sits
+      underneath on the back stack.
+
+
 - [x] **Per-device connection IP.** `DeviceProfile`/`CustomProfile` now
       carry an optional `connectionIp` — set via a new "Connection IP"
       option in Pin Mapper's device-management dialog (long-press a
@@ -608,11 +643,11 @@ themselves are no longer special either — see the de-specialization
 entry above.
 
 **Still open:**
-- [ ] A **single guided walkthrough** (board → pins → functions →
-      buttons as one continuous flow) rather than requiring someone to
-      already know to visit Pin Mapper then Controls separately.
-      Possibly better solved by the device-hosted web profile creator
-      idea (see "Future idea, not started" below) than by more phone UI.
+- [x] A **single guided walkthrough** — done, see the entry above
+      (`DeviceWizardActivity`). The web-hosted idea below may still be
+      worth building eventually too — this doesn't replace that, just
+      delivers the phone-based version now while the ESP32 wasn't
+      reachable for hardware testing anyway.
 - [x] A **device picker at session start** — done, see the entry above.
 - [x] Each device profile should carry **its own connection info** —
       done for IP (see the entry above). SSID/password deliberately

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0A0A"
+    android:fitsSystemWindows="true">
+
+    <!-- Header — matches Controller Mapping / Settings' style -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:background="#1A1A1A"
+        android:padding="12dp" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="🧭  Guided Device Setup"
+            android:textColor="#00E5FF" android:textSize="16sp" android:textStyle="bold"/>
+        <Button android:id="@+id/btnWizardClose"
+            android:layout_width="wrap_content" android:layout_height="32dp"
+            android:text="✕ Close" android:textSize="12sp" style="@style/CarButton"/>
+    </LinearLayout>
+
+    <!-- Step indicator -->
+    <TextView android:id="@+id/tvWizardStep"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Step 1 of 4 — Name your device"
+        android:textColor="#5F6A73" android:textSize="11sp"
+        android:padding="12dp" android:background="#111111"/>
+
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout android:id="@+id/wizardContent"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:padding="20dp"/>
+    </ScrollView>
+
+</LinearLayout>
