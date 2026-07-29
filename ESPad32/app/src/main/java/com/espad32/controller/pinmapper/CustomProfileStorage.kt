@@ -18,7 +18,16 @@ data class CustomProfile(
     val boardKey: String,
     // GPIO defaults for "Reset Defaults" — e.g. Train's motor_dir_a -> 26.
     // Empty for a genuinely new user-created device (nothing to reset to).
-    val defaults: Map<String, Int> = emptyMap()
+    val defaults: Map<String, Int> = emptyMap(),
+    // Which IP to connect to for THIS device — e.g. Train might always
+    // be its own AP at 192.168.4.1, while a different device lives on
+    // the home network at some other address. Null until the user sets
+    // it (via Pin Mapper's device-management dialog). Deliberately just
+    // an IP, not SSID/password — joining the right WiFi network is an
+    // OS-level phone setting outside the app's control; once the phone
+    // is already on the right network, the IP is the only thing this
+    // app itself needs to remember per device.
+    val connectionIp: String? = null
 )
 
 class CustomProfileStorage(context: Context) {
@@ -41,7 +50,8 @@ class CustomProfileStorage(context: Context) {
                     key = o.getString("key"),
                     displayName = o.getString("displayName"),
                     boardKey = o.getString("boardKey"),
-                    defaults = defaults
+                    defaults = defaults,
+                    connectionIp = if (o.has("connectionIp") && !o.isNull("connectionIp")) o.getString("connectionIp") else null
                 )
             )
         }
@@ -58,6 +68,7 @@ class CustomProfileStorage(context: Context) {
             val defaultsObj = JSONObject()
             p.defaults.forEach { (k, v) -> defaultsObj.put(k, v) }
             o.put("defaults", defaultsObj)
+            if (p.connectionIp != null) o.put("connectionIp", p.connectionIp)
             arr.put(o)
         }
         prefs.edit().putString(LIST_KEY, arr.toString()).apply()
@@ -88,6 +99,11 @@ class CustomProfileStorage(context: Context) {
 
     fun deleteProfile(key: String) {
         saveProfiles(loadProfiles().filterNot { it.key == key })
+    }
+
+    fun setConnectionIp(key: String, ip: String?) {
+        val updated = loadProfiles().map { if (it.key == key) it.copy(connectionIp = ip?.ifBlank { null }) else it }
+        saveProfiles(updated)
     }
 
     /**

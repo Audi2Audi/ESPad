@@ -79,7 +79,8 @@ data class DeviceProfile(
     val displayName: String,
     val boardKey: String,  // which BoardDef (in Boards.ALL) this profile targets
     val roles: List<PinRoleDef>,
-    val defaults: Map<String, Int>
+    val defaults: Map<String, Int>,
+    val connectionIp: String? = null
 )
 
 object Boards {

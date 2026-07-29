@@ -21,7 +21,8 @@ object ProfileResolver {
                 displayName = c.displayName,
                 boardKey = c.boardKey,
                 roles = emptyList(),
-                defaults = c.defaults
+                defaults = c.defaults,
+                connectionIp = c.connectionIp
             )
         }
     }

@@ -42,6 +42,23 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Per-device connection IP.** `DeviceProfile`/`CustomProfile` now
+      carry an optional `connectionIp` — set via a new "Connection IP"
+      option in Pin Mapper's device-management dialog (long-press a
+      device tab). Deliberately just an IP, not SSID/password — joining
+      the right WiFi network is an OS-level phone setting outside the
+      app's control; once the phone's already on the right network,
+      the IP is the only thing worth remembering per device.
+- [x] **A deliberate device picker at session start.** On launch, if
+      more than one profile exists, a dialog asks "Which device are you
+      using?" before connecting — picking one sets `ActiveProfile` and,
+      if that device has a saved connection IP, switches to it
+      automatically. Skips the dialog entirely when there's nothing to
+      choose (0 or 1 profiles) — a picker with a single option would
+      just be annoying, not useful. Dismissing without picking just
+      connects with whatever was already set, rather than blocking.
+
+
 - [x] **On-screen virtual gamepad buttons** — the app can now be fully
       used without a physical gamepad, joysticks (already existed) plus
       buttons (new). Deliberately plugs into the *existing* gamepad
@@ -596,14 +613,11 @@ entry above.
       already know to visit Pin Mapper then Controls separately.
       Possibly better solved by the device-hosted web profile creator
       idea (see "Future idea, not started" below) than by more phone UI.
-- [ ] A **device picker at session start**, as a deliberate step before
-      connecting — partially covered already (`ActiveProfile` now
-      respects last-selected on load instead of always forcing Train),
-      but there's no dedicated "choose your device" launch moment yet.
-- [ ] Each device profile should carry **its own connection info**
-      (AP SSID/password, or IP) alongside its board/pins/functions/
-      buttons — switching to a different profile doesn't yet also
-      point the app at that device's network.
+- [x] A **device picker at session start** — done, see the entry above.
+- [x] Each device profile should carry **its own connection info** —
+      done for IP (see the entry above). SSID/password deliberately
+      not stored — that's an OS-level WiFi setting, not something this
+      app manages.
 - [x] **Gamepad buttons mapped to user-defined functions** — added
       `ButtonFunction.CUSTOM_CONTROL`, which targets one of the
       currently-defined Controls buttons (by id) instead of a fixed car

@@ -176,7 +176,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         CarLogger.log("Main", "Connecting to $carIp")
         // Show placeholder until camera connects
         findViewById<android.view.View>(R.id.cameraPlaceholder)?.visibility = android.view.View.VISIBLE
-        connectToCar()
+        maybeShowDevicePickerThenConnect()
 
         controlPanelView.setButtonListener(object : ControlPanelView.ButtonListener {
             override fun onCameraFlip()                 { showUiTemporarily(); cameraStream?.let { it.flipped = !it.flipped } }
@@ -320,6 +320,45 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         CarLogger.log("Main", "Found \"$name\" at $ip — reconnecting")
         findViewById<android.view.View>(R.id.cameraPlaceholder)?.visibility = android.view.View.VISIBLE
         connectToCar()
+    }
+
+    // A deliberate "choose your device" moment before connecting, per
+    // session — not swapped mid-session, just picked once up front,
+    // matching the confirmed usage model (today's train, tomorrow's RC
+    // car, never juggling live connections at once). Skips the dialog
+    // entirely when there's nothing to choose (0 or 1 profiles exist),
+    // since forcing a picker with a single option would just be
+    // annoying rather than useful.
+    private fun maybeShowDevicePickerThenConnect() {
+        val profiles = com.espad32.controller.pinmapper.ProfileResolver.allProfiles(this)
+        if (profiles.size < 2) {
+            connectToCar()
+            return
+        }
+
+        val activeKey = com.espad32.controller.controls.ActiveProfile.get(this, Profiles.TRAIN.key)
+        val labels = profiles.map { it.displayName }.toTypedArray()
+        val preselected = profiles.indexOfFirst { it.key == activeKey }.let { if (it >= 0) it else 0 }
+
+        AlertDialog.Builder(this)
+            .setTitle("Which device are you using?")
+            .setSingleChoiceItems(labels, preselected) { dialog, which ->
+                val chosen = profiles[which]
+                com.espad32.controller.controls.ActiveProfile.set(this, chosen.key)
+                // If this device remembers its own connection IP, use
+                // it — otherwise leave whatever IP was already set.
+                if (!chosen.connectionIp.isNullOrBlank()) {
+                    carIp = chosen.connectionIp
+                    tvIp.text = carIp
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putString("ip", carIp).apply()
+                }
+                CarLogger.log("Main", "Using \"${chosen.displayName}\" this session.")
+                dialog.dismiss()
+                connectToCar()
+            }
+            .setOnCancelListener { connectToCar() } // dismissed without picking — just connect with whatever's already set
+            .setCancelable(true)
+            .show()
     }
 
     private fun connectToCar() {

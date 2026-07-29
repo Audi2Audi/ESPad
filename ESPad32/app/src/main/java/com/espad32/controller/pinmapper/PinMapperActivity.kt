@@ -193,11 +193,48 @@ class PinMapperActivity : AppCompatActivity() {
     private fun showManageDeviceDialog(profile: DeviceProfile) {
         AlertDialog.Builder(this)
             .setTitle(profile.displayName)
-            .setItems(arrayOf("Export", "Delete")) { _, which ->
+            .setItems(arrayOf("Connection IP", "Export", "Delete")) { _, which ->
                 when (which) {
-                    0 -> exportDevice(profile)
-                    1 -> showDeleteDeviceDialog(profile)
+                    0 -> showConnectionIpDialog(profile)
+                    1 -> exportDevice(profile)
+                    2 -> showDeleteDeviceDialog(profile)
                 }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // Lets a device profile remember which IP to connect to — e.g.
+    // Train might always be its own AP at 192.168.4.1, while a
+    // different device lives on the home network at some other
+    // address. Just an IP, not WiFi credentials — joining the right
+    // network is an OS-level phone setting, not something this app
+    // manages; once the phone's already on the right network, the IP
+    // is the only thing worth remembering per device.
+    private fun showConnectionIpDialog(profile: DeviceProfile) {
+        val input = EditText(this).apply {
+            hint = "e.g. 192.168.4.1"
+            setText(profile.connectionIp ?: "")
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 0)
+            addView(TextView(this@PinMapperActivity).apply {
+                text = "Which IP should \"${profile.displayName}\" connect to? " +
+                    "Leave blank to not remember one for this device."
+                textSize = 12f
+                setTextColor(Color.parseColor("#8A939C"))
+                setPadding(0, 0, 0, 16)
+            })
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Connection IP")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                customProfileStorage.setConnectionIp(profile.key, input.text.toString().trim())
+                log("Connection IP for \"${profile.displayName}\" ${if (input.text.isBlank()) "cleared" else "set to ${input.text}"}.")
             }
             .setNegativeButton("Cancel", null)
             .show()
