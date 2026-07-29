@@ -467,7 +467,6 @@ to the phone directly). Revisit only if a specific project needs it.
         GPIO numbering/restrictions and no direct code reuse from the
         ESP32 validation rules — worth a note but treat as its own
         research item, not a quick add, if it ever comes up
-- [ ] ~~Arduino support~~ — deferred, see decision above
 
 ## Near-term: renaming & custom roles
 
@@ -496,99 +495,45 @@ to the phone directly). Revisit only if a specific project needs it.
 
 ## Near-term: Controls screen follow-ups
 
-- [ ] **Live device sync** — the big one. Buttons currently only flip
-      local state and log what they'd send. Needs the same transport
-      (WiFi/TCP or BLE) already tracked below, plus a firmware command
-      handler that actually does `digitalWrite` on TOGGLE/MOMENTARY
-- [ ] Slider control for PWM_OUTPUT and SERVO roles (motor speed,
-      steering angle) — buttons only make sense for DIGITAL_OUTPUT;
-      continuous values need a different UI element entirely
+- [x] **Live device sync** — done long ago in practice, this entry just
+      never got marked. Buttons/sliders genuinely send `SET`/`SETV`/
+      `GET` over the real TCP connection; confirmed working across PWM,
+      analog input, gamepad axis mapping, all of it.
+- [x] **Slider control for PWM_OUTPUT** — done (`ControlType.SLIDER`).
+      **SERVO roles still have no slider or firmware support at all** —
+      angle control (`Servo.attach()`/`.write()`) is a different thing
+      from PWM duty and hasn't been built; don't conflate the two.
 - [ ] Momentary buttons currently log on tap only — for a real "on
       while held" feel this needs press/release touch handling
-      (`OnTouchListener`, not `OnClickListener`), which matters more
-      once live device sync exists (a real horn should stop honking on
-      release, not stay on until tapped again)
+      (`OnTouchListener`, not `OnClickListener`). Confirmed still true
+      as of the CUSTOM_CONTROL work — `executeCustomControlButton()`
+      sends ON on tap with an explicit comment that nothing turns it
+      back off yet.
 - [ ] Reordering buttons (drag-and-drop) once someone has more than a
-      handful — not needed yet with only 1-2 buttons per profile
+      handful — still not needed yet in practice, still not built.
 
-## Medium-term: user-defined device profiles (sharpened end goal)
+## Medium-term: user-defined device profiles
 
-**The actual end goal (confirmed):** a settings-driven flow —
-pick your board → pick/assign your pins → name your functions → add
-and name your buttons — producing a **user-created device profile**,
-not one of the two hardcoded `Profiles.TRAIN`/`Profiles.RC_CAR`
-entries. With that in place, someone with two trains (or a train and
-an RC car, or three unrelated projects) creates a named profile for
-each and switches between them, rather than the app only ever knowing
-about its two built-in device types.
+**Done:** the actual "New Device" flow (name → board → functions → pins
+→ buttons, persisted as a real profile alongside Train/RC Car, not a
+compile-time constant) — see the `[x]` entry above. Train/RC Car
+themselves are no longer special either — see the de-specialization
+entry above.
 
-**Usage model (confirmed): per-session, not hot-swapping.** This isn't
-about juggling multiple live connections at once — it's "today I drive
-my train, tomorrow my RC car, the day after my robot arm." You pick
-which device you're operating **before** connecting for that session,
-then use it as normal. This simplifies the transport question a lot:
-there's still only one live connection at a time, but that's fine,
-because there's only ever supposed to be one active session anyway.
-No need to solve concurrent connections or live-switching — just "pick
-your device, then connect to it."
-
-- [ ] `DeviceProfile` (or a new parallel type) needs to be something a
-      user creates and persists, not a compile-time constant — a
-      "New Device" flow: name it → pick a board → add functions one at
-      a time (reusing the custom-role creation flow already built) →
-      assign pins → save as its own profile, stored alongside (not
-      replacing) the built-in Train/RC Car ones
-      **Note:** different profiles will genuinely use different board
-      types, not just different pin assignments on the same board —
-      e.g. train on a D1 Mini32, a future robot arm on an ESP32-WROVER.
-      Already fine structurally (`DeviceProfile.boardKey` is already
-      per-profile, not global), but the "New Device" flow needs to make
-      board choice a real, deliberate step every time — never default
-      to "whichever board is first in the list." Also means `Boards.ALL`
-      needs to keep growing to cover whatever hardware people actually
-      build on — **ESP32-WROVER** (extra PSRAM, larger form factor,
-      common for camera/robotics projects) is a concrete candidate given
-      the robot arm mention, not yet added (only D1 Mini32 and ESP32
-      DevKit V1 exist today).
-- [ ] A **settings entry point** that walks through board → pins →
-      functions → buttons as one guided sequence, instead of requiring
-      someone to already know to visit Pin Mapper then Controls
-      separately
-- [ ] A **device picker at session start** — e.g. a launch screen or a
-      menu item on the main screen, picked once before connecting, not
-      swapped mid-session. `ActiveProfile` already exists as the "which
-      profile is active" concept (currently last-selected-wins from Pin
-      Mapper/Controls); this becomes the deliberate "choose your
-      device" moment instead of an implicit side effect of whichever
-      screen you opened last
+**Still open:**
+- [ ] A **single guided walkthrough** (board → pins → functions →
+      buttons as one continuous flow) rather than requiring someone to
+      already know to visit Pin Mapper then Controls separately.
+      Possibly better solved by the device-hosted web profile creator
+      idea (see "Future idea, not started" below) than by more phone UI.
+- [ ] A **device picker at session start**, as a deliberate step before
+      connecting — partially covered already (`ActiveProfile` now
+      respects last-selected on load instead of always forcing Train),
+      but there's no dedicated "choose your device" launch moment yet.
 - [ ] Each device profile should carry **its own connection info**
-      (AP SSID/password, or IP if on a shared network) alongside its
-      board/pins/functions/buttons — so picking "Train" for today's
-      session also means the app knows which network/IP to connect to
-      for that specific board, without the user having to separately
-      remember and re-enter it. This is where the earlier "editable
-      per-device SSID/password" note connects directly to this work,
-      rather than being a separate feature.
-- [ ] **Final piece of the settings flow: map GameSir/gamepad buttons to
-      user-defined functions too**, not just on-screen Controls buttons.
-      There's already real infrastructure for this — `ControllerMapping.kt`
-      + `ControllerMappingActivity.kt` is a full gamepad button/axis
-      remapping system with presets, wired to real `KeyEvent`/
-      `MotionEvent` handling. It's currently hardcoded to the old
-      Freenove-specific `ButtonFunction` enum (LED_CYCLE, SERVO_RESET,
-      etc), some of which no longer correspond to anything now that
-      those were removed from the on-screen panel. Generalizing this
-      means a gamepad button press needs to trigger the same
-      `DeviceCommand.sendSet()` path an on-screen Controls tap already
-      does, targeting whichever custom/built-in role the user assigns —
-      not a fixed enum of car commands.
-      Same split as elsewhere in this doc: **buttons** (on/off — face
-      buttons, triggers, D-pad) are the easy half, since they map
-      directly onto `DIGITAL_OUTPUT` roles that already work end to end.
-      **Axes/sticks** (continuous values — steering, throttle) need the
-      PWM/servo slider equivalent that's already flagged as unbuilt
-      above, so gamepad-axis-to-custom-function mapping naturally
-      follows behind that, not before it.
+      (AP SSID/password, or IP) alongside its board/pins/functions/
+      buttons — switching to a different profile doesn't yet also
+      point the app at that device's network.
 - [x] **Gamepad buttons mapped to user-defined functions** — added
       `ButtonFunction.CUSTOM_CONTROL`, which targets one of the
       currently-defined Controls buttons (by id) instead of a fixed car
@@ -707,10 +652,6 @@ your device, then connect to it."
       `Boards.ALL` — name it, mark which physical pins exist, flag
       restrictions manually. Bigger lift (needs its own validation UI
       and persisted custom-board definitions)
-- [ ] Export/import a device profile as JSON — lets one person's
-      "smart terrarium controller" profile get shared and reused by
-      someone else with the same hardware, without remapping from
-      scratch
 
 ## Live device transport — confirmed architecture
 
@@ -808,18 +749,19 @@ code.
 
 ## Bigger lift: firmware-side generality
 
-This is the harder half, and probably the long pole for "control any
-ESP32/Arduino project" as a real goal:
+This section was written before almost any of the actual generic
+firmware work existed — both items below are now resolved in spirit,
+kept here only so the historical framing isn't lost:
 
-- [ ] Right now `pin_validation.h` / `pin_store.h` on the firmware side
-      assume a fixed, known set of roles per profile. Supporting
-      arbitrary user-defined devices means firmware also needs a
-      generic capability system — e.g. "here's a PWM output on pin X,
-      here's a digital sensor on pin Y" — resolved at runtime, rather
-      than compiled-in driver logic per profile
-- [ ] Extend the confirmed-working `SET <role> <value>` command (proven
-      over Serial) to run over the TCP connection instead — this is the
-      concrete next build step, not just a research question anymore
+- [x] "Firmware needs a generic capability system, not fixed per-profile
+      roles" — this is now just how it works: the JSON payload's
+      `{role, gpio}` pairs are already fully generic per-profile, not
+      hardcoded driver logic. `SET`/`SETV`/`GET` all operate purely on
+      whatever role/pin was assigned at runtime.
+- [x] "Extend SET to run over TCP" — done ages ago; TCP (port 4000) has
+      been the live command transport this whole time, proven far
+      beyond the original single-command scope (SETV, GET, CMD_WIFI_*,
+      CMD_VERSION, OTA on a separate port).
 
 ## Known issue to investigate
 
