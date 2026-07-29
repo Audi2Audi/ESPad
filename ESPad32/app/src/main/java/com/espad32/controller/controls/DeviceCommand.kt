@@ -54,6 +54,11 @@ object DeviceCommand {
         sendRaw("GET $role\n", onResult)
     }
 
+    /** Sends SETA <role> <0-180> for SERVO roles — real angle control, not PWM duty. */
+    fun sendSetAngle(role: String, angle: Int, onResult: (String?) -> Unit) {
+        sendRaw("SETA $role ${angle.coerceIn(0, 180)}\n", onResult)
+    }
+
     /**
      * Sends any single-line command (a SET command, or a full JSON pin
      * config payload — both are just one line ending in \n) and captures

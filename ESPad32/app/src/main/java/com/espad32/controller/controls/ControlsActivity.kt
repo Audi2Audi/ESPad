@@ -89,11 +89,11 @@ class ControlsActivity : AppCompatActivity() {
         renderButtons()
     }
 
-    /** Roles eligible to back a control — digital outputs (toggle/momentary)
-     *  and PWM outputs (slider), built-in AND custom. SERVO isn't offered —
-     *  firmware has no angle-control command yet. */
+    /** Roles eligible to back a control — digital outputs (toggle/momentary),
+     *  PWM outputs (slider), and servo (slider, 0-180 degrees), built-in
+     *  AND custom. */
     private fun eligibleRoles() = RoleResolver.effectiveRoles(currentProfile, customRoleStorage)
-        .filter { it.type == RoleType.DIGITAL_OUTPUT || it.type == RoleType.PWM_OUTPUT }
+        .filter { it.type == RoleType.DIGITAL_OUTPUT || it.type == RoleType.PWM_OUTPUT || it.type == RoleType.SERVO }
 
     private fun renderButtons() {
         buttonListContainer.removeAllViews()
@@ -214,7 +214,9 @@ class ControlsActivity : AppCompatActivity() {
     }
 
     private fun buildSliderRow(btn: ControlButtonDef, role: com.espad32.controller.pinmapper.PinRoleDef?, gpio: Int?): android.view.View {
-        val currentValue = buttonStorage.getValue(currentProfile.key, btn.id)
+        val isServo = role?.type == RoleType.SERVO
+        val maxValue = if (isServo) 180 else 255
+        val currentValue = buttonStorage.getValue(currentProfile.key, btn.id).coerceIn(0, maxValue)
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -241,12 +243,12 @@ class ControlsActivity : AppCompatActivity() {
             textSize = 14f
         })
         infoCol.addView(TextView(this).apply {
-            text = "${role?.label ?: btn.roleKey} · GPIO ${gpio ?: "?"} · pwm"
+            text = "${role?.label ?: btn.roleKey} · GPIO ${gpio ?: "?"} · ${if (isServo) "servo" else "pwm"}"
             setTextColor(Color.parseColor("#5F6A73"))
             textSize = 10.5f
         })
         val valueLabel = TextView(this).apply {
-            text = currentValue.toString()
+            text = if (isServo) "${currentValue}°" else currentValue.toString()
             setTextColor(Color.parseColor("#E3A458"))
             textSize = 16f
             setPadding(16, 0, 0, 0)
@@ -257,12 +259,12 @@ class ControlsActivity : AppCompatActivity() {
         container.addView(headerRow)
 
         val seekBar = android.widget.SeekBar(this).apply {
-            max = 255
+            max = maxValue
             progress = currentValue
         }
         seekBar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: android.widget.SeekBar?, value: Int, fromUser: Boolean) {
-                valueLabel.text = value.toString()
+                valueLabel.text = if (isServo) "${value}°" else value.toString()
             }
             override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
             override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {
@@ -272,9 +274,15 @@ class ControlsActivity : AppCompatActivity() {
                 // commands per second for a single drag gesture.
                 val value = sb?.progress ?: 0
                 buttonStorage.setValue(currentProfile.key, btn.id, value)
-                log("\"${btn.label}\" -> $value — sending...")
-                DeviceCommand.sendSetValue(btn.roleKey, value) { response ->
-                    log(response ?: "\"${btn.label}\": no response (check connection)")
+                log("\"${btn.label}\" -> ${if (isServo) "$value°" else value.toString()} — sending...")
+                if (isServo) {
+                    DeviceCommand.sendSetAngle(btn.roleKey, value) { response ->
+                        log(response ?: "\"${btn.label}\": no response (check connection)")
+                    }
+                } else {
+                    DeviceCommand.sendSetValue(btn.roleKey, value) { response ->
+                        log(response ?: "\"${btn.label}\": no response (check connection)")
+                    }
                 }
             }
         })
@@ -352,7 +360,7 @@ class ControlsActivity : AppCompatActivity() {
         val behaviorContainer = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
         var selectedRole = eligible.first()
-        var selectedType = if (selectedRole.type == RoleType.PWM_OUTPUT) ControlType.SLIDER else ControlType.TOGGLE
+        var selectedType = if (selectedRole.type == RoleType.PWM_OUTPUT || selectedRole.type == RoleType.SERVO) ControlType.SLIDER else ControlType.TOGGLE
 
         fun rebuildBehaviorSection() {
             behaviorContainer.removeAllViews()
@@ -360,6 +368,13 @@ class ControlsActivity : AppCompatActivity() {
                 selectedType = ControlType.SLIDER
                 behaviorContainer.addView(TextView(this).apply {
                     text = "Slider (0-255) — the only option for a PWM function"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#5F6A73"))
+                })
+            } else if (selectedRole.type == RoleType.SERVO) {
+                selectedType = ControlType.SLIDER
+                behaviorContainer.addView(TextView(this).apply {
+                    text = "Slider (0-180°) — the only option for a servo function"
                     textSize = 11f
                     setTextColor(Color.parseColor("#5F6A73"))
                 })

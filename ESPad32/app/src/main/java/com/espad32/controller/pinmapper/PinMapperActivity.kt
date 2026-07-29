@@ -772,25 +772,32 @@ class PinMapperActivity : AppCompatActivity() {
             isAllCaps = false
             setOnClickListener { selectedType = RoleType.ANALOG_INPUT; highlightSelected() }
         }
+        val servoBtn = Button(this).apply {
+            text = "Servo"
+            textSize = 11f
+            isAllCaps = false
+            setOnClickListener { selectedType = RoleType.SERVO; highlightSelected() }
+        }
         typeButtons[RoleType.DIGITAL_OUTPUT] = digitalBtn
         typeButtons[RoleType.PWM_OUTPUT] = pwmBtn
         typeButtons[RoleType.ANALOG_INPUT] = analogBtn
+        typeButtons[RoleType.SERVO] = servoBtn
         typeRow.addView(digitalBtn)
         typeRow.addView(pwmBtn)
         typeRow.addView(analogBtn)
+        typeRow.addView(servoBtn)
         container.addView(typeRow)
         highlightSelected()
 
-        // SERVO isn't offered — firmware has no angle-control command
-        // yet (SETV is PWM duty only), so creating a SERVO role here
-        // would produce something Controls can't actually drive
-        // correctly. See PIN_MAPPER_ROADMAP.md.
+        // Servo now genuinely supported — real angle control (SETA,
+        // 0-180 degrees) via the ESP32Servo library, not just PWM duty
+        // reinterpreted as an angle. See PIN_MAPPER_ROADMAP.md.
         val noteText = TextView(this).apply {
             text = "On/Off backs a toggle button in Controls. PWM backs a slider " +
-                "(0-255). Analog In reads a live voltage — e.g. battery level via " +
-                "your own voltage divider — and can only go on an ADC1 pin " +
-                "(32/33/34/35/36/39, marked available in the diagram above); servo " +
-                "angle control isn't supported by the firmware yet."
+                "(0-255). Servo backs a slider too, but 0-180 degrees, sent as a " +
+                "real angle command. Analog In reads a live voltage — e.g. battery " +
+                "level via your own voltage divider — and can only go on an ADC1 " +
+                "pin (32/33/34/35/36/39, marked available in the diagram above)."
             textSize = 11f
             setTextColor(Color.parseColor("#5F6A73"))
             setPadding(0, 20, 0, 0)

@@ -745,9 +745,15 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // mapped gamepad axis — same DeviceCommand.sendSetValue path the
     // on-screen slider itself uses (including the centralized PWM
     // inversion compensation), so behavior is identical either way.
+    // `value` arrives pre-normalized 0-255 (see the CUSTOM_PWM case in
+    // onGenericMotionEvent) regardless of what it's ultimately headed
+    // for — rescaled down to 0-180 here if the target turns out to be
+    // a servo, rather than changing the caller's normalization (which
+    // also drives the "did this actually change" dedup check in 0-255
+    // space).
     private fun executeCustomPwmAxis(buttonId: String?, value: Int) {
         if (buttonId == null) {
-            CarLogger.log("Controls", "Gamepad axis has no PWM slider assigned yet.")
+            CarLogger.log("Controls", "Gamepad axis has no PWM/servo slider assigned yet.")
             return
         }
         val profileKey = com.espad32.controller.controls.ActiveProfile.get(
@@ -755,12 +761,25 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         )
         val btn = controlButtonStorage.loadButtons(profileKey).find { it.id == buttonId }
         if (btn == null) {
-            CarLogger.log("Controls", "Assigned PWM slider no longer exists (was it deleted?).")
+            CarLogger.log("Controls", "Assigned PWM/servo slider no longer exists (was it deleted?).")
             return
         }
-        controlButtonStorage.setValue(profileKey, btn.id, value)
-        com.espad32.controller.controls.DeviceCommand.sendSetValue(btn.roleKey, value) { response ->
-            CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+        val role = com.espad32.controller.pinmapper.RoleResolver.effectiveRoles(
+            com.espad32.controller.pinmapper.ProfileResolver.allProfiles(this).find { it.key == profileKey }
+                ?: return, customRoleStorageForSensor
+        ).find { it.key == btn.roleKey }
+
+        if (role?.type == com.espad32.controller.pinmapper.RoleType.SERVO) {
+            val angle = (value * 180 / 255).coerceIn(0, 180)
+            controlButtonStorage.setValue(profileKey, btn.id, angle)
+            com.espad32.controller.controls.DeviceCommand.sendSetAngle(btn.roleKey, angle) { response ->
+                CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+            }
+        } else {
+            controlButtonStorage.setValue(profileKey, btn.id, value)
+            com.espad32.controller.controls.DeviceCommand.sendSetValue(btn.roleKey, value) { response ->
+                CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+            }
         }
     }
 

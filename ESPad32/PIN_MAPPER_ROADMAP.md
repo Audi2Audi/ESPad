@@ -19,10 +19,11 @@ core R/C functionality from scratch.
 **What that test would realistically cover, and what it wouldn't:**
 - ✅ **In scope, achievable with the generic framework:** drive motors
   (direction + PWM speed — already works), pan/tilt camera servos
-  (needs real servo angle support first — see below, currently only
-  PWM duty exists, not `Servo.attach()`/angle control), a headlight
-  or indicator LED (already works), a horn/buzzer (already works via
-  DIGITAL_OUTPUT or PWM_OUTPUT).
+  (real angle control now built — see the servo entry below; single-
+  axis servo control works, true dual-axis pan+tilt from one stick
+  would still need the differential/dual-axis mapping noted as not
+  yet built), a headlight or indicator LED (already works), a horn/
+  buzzer (already works via DIGITAL_OUTPUT or PWM_OUTPUT).
 - ❌ **Likely permanently out of scope, and worth being upfront about
   that now rather than treating it as a gap to eventually fill:** the
   WS2812 addressable RGB LED strip (a genuinely different protocol
@@ -41,6 +42,42 @@ core R/C functionality from scratch.
   tools — not literally 100% of the original firmware's feature set.
 
 ## Status: done so far
+
+- [x] **Real servo angle control, end to end.** The last major gap
+      blocking the full-circle Freenove-car test — servo is genuinely
+      different from PWM duty (a ~50Hz signal with pulse width mapped
+      to angle, not an arbitrary duty cycle), not just PWM with a
+      different label.
+      - Firmware: new `SETA <role> <0-180>` command (`servo_ctrl.h`),
+        using the **ESP32Servo** library (Library Manager — NOT the
+        plain Arduino `Servo.h`, which doesn't support ESP32). Each
+        GPIO gets its own `Servo` object, lazily attached on first use,
+        same pattern as `SETV`'s `ledcAttachedPins` tracking.
+      - Pin Mapper's "Add Function" type picker now offers Servo as a
+        4th option, alongside On/Off/PWM/Analog In.
+      - Controls' slider is now servo-aware: 0-180° range and `SETA`
+        for servo roles, 0-255 and `SETV` for PWM roles — resolved by
+        checking the underlying role's type, not a separate widget or
+        `ControlType`. Reusing `ControlType.SLIDER` for both (rather
+        than adding a `SERVO_SLIDER` variant) meant the gamepad axis
+        picker in Controller Mapping needed zero changes — it already
+        filters on `ControlType.SLIDER` generically.
+      - Gamepad axis mapping (`CUSTOM_PWM`) also servo-aware — rescales
+        the normalized 0-255 axis value down to 0-180 and calls
+        `sendSetAngle()` when the mapped target turns out to be a
+        servo, resolved at dispatch time rather than changing how the
+        axis itself gets normalized.
+      - **Nice validation of earlier design:** RC Car's seeded
+        "Steering servo" role was already correctly typed
+        `RoleType.SERVO` from early in the session, just waiting for
+        real support to catch up — it'll work automatically now with
+        zero changes needed to the seed data itself.
+      **Not addressed:** true differential-drive/dual-servo *axis*
+      mapping (one physical stick driving two things at once, e.g.
+      combined pan+tilt from a single 2D stick) — `CUSTOM_PWM` is still
+      single-axis-to-single-slider only. A real dual-axis mapping would
+      be a separate, more involved feature.
+
 
 - [x] **Guided Device Setup wizard** — board → functions → pins →
       buttons as one continuous flow, instead of needing to already
@@ -627,9 +664,8 @@ to the phone directly). Revisit only if a specific project needs it.
       `GET` over the real TCP connection; confirmed working across PWM,
       analog input, gamepad axis mapping, all of it.
 - [x] **Slider control for PWM_OUTPUT** — done (`ControlType.SLIDER`).
-      **SERVO roles still have no slider or firmware support at all** —
-      angle control (`Servo.attach()`/`.write()`) is a different thing
-      from PWM duty and hasn't been built; don't conflate the two.
+      **Servo support (angle control, not PWM duty) — since built, see
+      the entry above.**
 - [x] Momentary press/release — done, see the entry above.
 - [x] Reordering buttons — done, see the entry above (simple ▲▼, not
       full drag-and-drop).
