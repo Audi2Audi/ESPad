@@ -661,8 +661,12 @@ entry above.
       active profile's Controls buttons by label. Firing it calls the
       exact same `DeviceCommand.sendSet()` path the on-screen tap uses,
       so behavior (and the device log) is identical either way.
-      **Axes/sticks still not done** — this covers buttons only, per
-      the split noted above.
+      **Axes/sticks were "not done" when this was written — since
+      resolved:** see the `CUSTOM_PWM` axis-mapping entry elsewhere in
+      this doc (gamepad axis → a Controls PWM slider). Buttons and
+      single-axis PWM both work now; only a true differential-drive/
+      dual-servo axis mapping remains undone, since neither has a
+      generic firmware equivalent yet.
 - [x] **PWM functions wired end-to-end in the app** — Pin Mapper's
       "Add Function" now has a real type picker (On/Off vs. PWM 0-255),
       not hardcoded to digital-only. Controls' "Add Button" adapts its
