@@ -223,7 +223,92 @@ object Boards {
         )
     )
 
-    val ALL = listOf(D1_MINI32, ESP32_DEVKIT_V1, ESP32_CAM_AI_THINKER)
+    // ESP32-S3-DevKitC-1 — newer chip, more GPIOs, native USB. S3 dev
+    // boards vary more between variants (plain WROOM-1 vs octal-PSRAM
+    // versions use different flash/PSRAM pin counts) than the original
+    // ESP32 does, so this is a reasonable common-case layout — verify
+    // against your specific board/schematic before relying on it,
+    // same caveat as the other boards here.
+    val ESP32_S3_DEVKIT = BoardDef(
+        key = "esp32_s3_devkit",
+        displayName = "ESP32-S3 DevKitC-1",
+        leftHeader = listOf(
+            BoardPin("3V3", null, PinStatus.RESERVED),
+            BoardPin("EN", null, PinStatus.RESERVED),
+            BoardPin("4", 4, PinStatus.AVAILABLE),
+            BoardPin("5", 5, PinStatus.AVAILABLE),
+            BoardPin("6", 6, PinStatus.AVAILABLE),
+            BoardPin("7", 7, PinStatus.AVAILABLE),
+            BoardPin("15", 15, PinStatus.AVAILABLE),
+            BoardPin("16", 16, PinStatus.AVAILABLE),
+            BoardPin("17", 17, PinStatus.AVAILABLE),
+            BoardPin("18", 18, PinStatus.AVAILABLE),
+            BoardPin("8", 8, PinStatus.AVAILABLE),
+            BoardPin("3", 3, PinStatus.STRAPPING),
+            BoardPin("46", 46, PinStatus.STRAPPING),
+            BoardPin("9", 9, PinStatus.AVAILABLE),
+            BoardPin("10", 10, PinStatus.AVAILABLE),
+            BoardPin("11", 11, PinStatus.AVAILABLE),
+            BoardPin("12", 12, PinStatus.AVAILABLE),
+            BoardPin("13", 13, PinStatus.AVAILABLE),
+            BoardPin("14", 14, PinStatus.AVAILABLE)
+        ),
+        rightHeader = listOf(
+            BoardPin("GND", null, PinStatus.RESERVED),
+            BoardPin("43 (TX0)", 43, PinStatus.UART),
+            BoardPin("44 (RX0)", 44, PinStatus.UART),
+            BoardPin("1", 1, PinStatus.AVAILABLE),
+            BoardPin("2", 2, PinStatus.AVAILABLE),
+            BoardPin("42", 42, PinStatus.AVAILABLE),
+            BoardPin("41", 41, PinStatus.AVAILABLE),
+            BoardPin("40", 40, PinStatus.AVAILABLE),
+            BoardPin("39", 39, PinStatus.AVAILABLE),
+            BoardPin("38", 38, PinStatus.AVAILABLE),
+            BoardPin("37", 37, PinStatus.RESERVED), // often PSRAM on octal variants
+            BoardPin("36", 36, PinStatus.RESERVED), // often PSRAM on octal variants
+            BoardPin("35", 35, PinStatus.RESERVED), // often PSRAM on octal variants
+            BoardPin("0", 0, PinStatus.STRAPPING),
+            BoardPin("45", 45, PinStatus.STRAPPING),
+            BoardPin("48", 48, PinStatus.AVAILABLE),
+            BoardPin("47", 47, PinStatus.AVAILABLE),
+            BoardPin("21", 21, PinStatus.AVAILABLE),
+            BoardPin("20 (USB D+)", 20, PinStatus.STRAPPING), // native USB if used - risky to repurpose
+            BoardPin("19 (USB D-)", 19, PinStatus.STRAPPING)  // native USB if used - risky to repurpose
+        )
+    )
+
+    // ESP32-C3-DevKitM-1 — RISC-V, single core, fewer pins, cheaper.
+    // Good fit for simple single-function builds. Same verify-against-
+    // your-board caveat as above; C3 boards are a newer, less
+    // standardized family than the original ESP32.
+    val ESP32_C3_DEVKIT = BoardDef(
+        key = "esp32_c3_devkit",
+        displayName = "ESP32-C3 DevKitM-1",
+        leftHeader = listOf(
+            BoardPin("3V3", null, PinStatus.RESERVED),
+            BoardPin("EN", null, PinStatus.RESERVED),
+            BoardPin("4", 4, PinStatus.AVAILABLE),
+            BoardPin("5", 5, PinStatus.AVAILABLE),
+            BoardPin("6", 6, PinStatus.AVAILABLE),
+            BoardPin("7", 7, PinStatus.AVAILABLE),
+            BoardPin("8", 8, PinStatus.STRAPPING),
+            BoardPin("9", 9, PinStatus.STRAPPING),
+            BoardPin("10", 10, PinStatus.AVAILABLE)
+        ),
+        rightHeader = listOf(
+            BoardPin("GND", null, PinStatus.RESERVED),
+            BoardPin("0", 0, PinStatus.AVAILABLE),
+            BoardPin("1", 1, PinStatus.AVAILABLE),
+            BoardPin("2", 2, PinStatus.STRAPPING),
+            BoardPin("3", 3, PinStatus.AVAILABLE),
+            BoardPin("21 (TX0)", 21, PinStatus.UART),
+            BoardPin("20 (RX0)", 20, PinStatus.UART),
+            BoardPin("18", 18, PinStatus.AVAILABLE),
+            BoardPin("19", 19, PinStatus.AVAILABLE)
+        )
+    )
+
+    val ALL = listOf(D1_MINI32, ESP32_DEVKIT_V1, ESP32_CAM_AI_THINKER, ESP32_S3_DEVKIT, ESP32_C3_DEVKIT)
 
     fun byKey(key: String): BoardDef = ALL.find { it.key == key } ?: D1_MINI32
 }

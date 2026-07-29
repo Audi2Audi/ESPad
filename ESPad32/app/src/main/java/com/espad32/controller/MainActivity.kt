@@ -595,8 +595,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (!isGamepad(event)) return super.onKeyUp(keyCode, event)
-        if (ControllerMapping.functionForKey(keyCode) == ButtonFunction.HORN_ON)
-            enqueue("CMD_BUZZER#0#2000\n")
+        val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
+        when (mapping?.function) {
+            ButtonFunction.HORN_ON -> enqueue("CMD_BUZZER#0#2000\n")
+            ButtonFunction.CUSTOM_CONTROL -> executeCustomControlButton(mapping.customButtonId, pressed = false)
+            else -> {}
+        }
         return true
     }
 
@@ -631,10 +635,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // mapped gamepad press — same DeviceCommand.sendSet path the
     // on-screen Controls button itself uses, so behavior (and the
     // device log) is identical whether it's tapped on screen or fired
-    // from the gamepad.
-    private fun executeCustomControlButton(buttonId: String?) {
+    // from the gamepad. `pressed` distinguishes button-down from
+    // button-up — MOMENTARY genuinely needs both (matches the same
+    // touch-based fix in ControlsActivity/buildLiveButton); TOGGLE
+    // ignores the release call entirely, since it only makes sense to
+    // flip on press.
+    private fun executeCustomControlButton(buttonId: String?, pressed: Boolean = true) {
         if (buttonId == null) {
-            CarLogger.log("Controls", "Gamepad button has no Control button assigned yet.")
+            if (pressed) CarLogger.log("Controls", "Gamepad button has no Control button assigned yet.")
             return
         }
         val profileKey = com.espad32.controller.controls.ActiveProfile.get(
@@ -642,12 +650,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         )
         val btn = controlButtonStorage.loadButtons(profileKey).find { it.id == buttonId }
         if (btn == null) {
-            CarLogger.log("Controls", "Assigned Control button no longer exists (was it deleted?).")
+            if (pressed) CarLogger.log("Controls", "Assigned Control button no longer exists (was it deleted?).")
             return
         }
 
         when (btn.controlType) {
             com.espad32.controller.controls.ControlType.TOGGLE -> {
+                if (!pressed) return // only flip on press, release is a no-op
                 val newState = !controlButtonStorage.getState(profileKey, btn.id)
                 controlButtonStorage.setState(profileKey, btn.id, newState)
                 CarLogger.log("Controls", "[Gamepad] \"${btn.label}\" -> ${if (newState) "ON" else "OFF"} — sending...")
@@ -657,8 +666,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 }
             }
             com.espad32.controller.controls.ControlType.MOMENTARY -> {
-                CarLogger.log("Controls", "[Gamepad] \"${btn.label}\" pressed — sending...")
-                com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, true) { response ->
+                CarLogger.log("Controls", "[Gamepad] \"${btn.label}\" ${if (pressed) "pressed" else "released"} — sending...")
+                com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, pressed) { response ->
                     CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
                 }
             }
@@ -851,6 +860,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    private fun handleLiveMomentaryPress(btn: ControlButtonDef, pressed: Boolean) {
+        CarLogger.log("Controls", "\"${btn.label}\" ${if (pressed) "pressed" else "released"} — sending...")
+        com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, pressed) { response ->
+            CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+        }
+    }
+
     private fun buildLiveButton(profileKey: String, btn: ControlButtonDef, isLastInRow: Boolean, soloInRow: Boolean): Button {
         val isOn = controlButtonStorage.getState(profileKey, btn.id)
         val view = layoutInflater.inflate(R.layout.item_dynamic_car_button, null) as Button
@@ -870,31 +886,44 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
         view.layoutParams = params
 
-        view.setOnClickListener {
-            when (btn.controlType) {
-                ControlType.TOGGLE -> {
-                    val newState = !controlButtonStorage.getState(profileKey, btn.id)
-                    controlButtonStorage.setState(profileKey, btn.id, newState)
-                    CarLogger.log("Controls", "\"${btn.label}\" -> ${if (newState) "ON" else "OFF"} — sending...")
-                    com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, newState) { response ->
-                        CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
-                        renderLiveButtons()
+        if (btn.controlType == ControlType.MOMENTARY) {
+            // Real press/release, not a tap — matches the same fix in
+            // ControlsActivity. A horn/buzzer should stop the moment
+            // you lift your finger, not stay on until tapped again.
+            view.setOnTouchListener { v, event ->
+                when (event.action) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        handleLiveMomentaryPress(btn, true)
+                        v.performClick()
+                        true
                     }
-                }
-                ControlType.MOMENTARY -> {
-                    // Sends ON only — true press/release isn't wired yet,
-                    // see PIN_MAPPER_ROADMAP.md.
-                    CarLogger.log("Controls", "\"${btn.label}\" pressed — sending...")
-                    com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, true) { response ->
-                        CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        handleLiveMomentaryPress(btn, false)
+                        true
                     }
-                }
-                com.espad32.controller.controls.ControlType.SLIDER -> {
-                    // Never reached — SLIDER buttons are filtered out
-                    // before reaching this panel (renderLiveButtons).
+                    else -> false
                 }
             }
-            renderLiveButtons()
+        } else {
+            view.setOnClickListener {
+                when (btn.controlType) {
+                    ControlType.TOGGLE -> {
+                        val newState = !controlButtonStorage.getState(profileKey, btn.id)
+                        controlButtonStorage.setState(profileKey, btn.id, newState)
+                        CarLogger.log("Controls", "\"${btn.label}\" -> ${if (newState) "ON" else "OFF"} — sending...")
+                        com.espad32.controller.controls.DeviceCommand.sendSet(btn.roleKey, newState) { response ->
+                            CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
+                            renderLiveButtons()
+                        }
+                    }
+                    com.espad32.controller.controls.ControlType.SLIDER -> {
+                        // Never reached — SLIDER buttons are filtered out
+                        // before reaching this panel (renderLiveButtons).
+                    }
+                    ControlType.MOMENTARY -> {} // handled by the touch listener above, never reached here
+                }
+                renderLiveButtons()
+            }
         }
         view.setOnLongClickListener {
             showLiveEditDialog(profileKey, btn)

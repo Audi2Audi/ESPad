@@ -104,6 +104,42 @@ class ControlsActivity : AppCompatActivity() {
         }
     }
 
+    // Simple ▲▼ reorder — not full drag-and-drop, since the button list
+    // is a plain rendered LinearLayout, not a RecyclerView. At the scale
+    // this app operates at (a handful of buttons per profile), this
+    // gets the actual value (reordering) without the bigger lift of an
+    // ItemTouchHelper/RecyclerView migration.
+    private fun addReorderColumn(row: LinearLayout, btn: ControlButtonDef) {
+        val index = buttons.indexOfFirst { it.id == btn.id }
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(16, 0, 0, 0)
+        }
+        val canMoveUp = index > 0
+        val canMoveDown = index in 0 until (buttons.size - 1)
+        col.addView(TextView(this).apply {
+            text = "▲"; textSize = 11f
+            setTextColor(Color.parseColor(if (canMoveUp) "#8A939C" else "#333940"))
+            setPadding(12, 2, 12, 2)
+            if (canMoveUp) setOnClickListener { moveButton(index, index - 1) }
+        })
+        col.addView(TextView(this).apply {
+            text = "▼"; textSize = 11f
+            setTextColor(Color.parseColor(if (canMoveDown) "#8A939C" else "#333940"))
+            setPadding(12, 2, 12, 2)
+            if (canMoveDown) setOnClickListener { moveButton(index, index + 1) }
+        })
+        row.addView(col)
+    }
+
+    private fun moveButton(from: Int, to: Int) {
+        val item = buttons.removeAt(from)
+        buttons.add(to, item)
+        buttonStorage.saveButtons(currentProfile.key, buttons)
+        renderButtons()
+    }
+
     private fun buildButtonRow(btn: ControlButtonDef): android.view.View {
         val role = RoleResolver.effectiveRoles(currentProfile, customRoleStorage).find { it.key == btn.roleKey }
         val boardKey = pinStorage.loadSelectedBoard(currentProfile.key, currentProfile.boardKey)
@@ -143,15 +179,36 @@ class ControlsActivity : AppCompatActivity() {
         })
 
         val toggleBtn = Button(this).apply {
-            text = if (isOn) "ON" else "OFF"
+            text = if (btn.controlType == ControlType.MOMENTARY) "HOLD" else (if (isOn) "ON" else "OFF")
             textSize = 12f
             setBackgroundColor(Color.parseColor(if (isOn) "#E3A458" else "#262D35"))
             setTextColor(Color.parseColor(if (isOn) "#1A1408" else "#8A939C"))
-            setOnClickListener { handleTap(btn) }
+            if (btn.controlType == ControlType.MOMENTARY) {
+                // Real press/release, not a tap — a horn/buzzer should
+                // stop the moment you lift your finger, not stay on
+                // until tapped again.
+                setOnTouchListener { v, event ->
+                    when (event.action) {
+                        android.view.MotionEvent.ACTION_DOWN -> {
+                            handleMomentaryPress(btn, true)
+                            v.performClick()
+                            true
+                        }
+                        android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                            handleMomentaryPress(btn, false)
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            } else {
+                setOnClickListener { handleTap(btn) }
+            }
         }
 
         row.addView(infoCol)
         row.addView(toggleBtn)
+        addReorderColumn(row, btn)
         row.setOnLongClickListener { showEditButtonDialog(btn); true }
         return row
     }
@@ -196,6 +253,7 @@ class ControlsActivity : AppCompatActivity() {
         }
         headerRow.addView(infoCol)
         headerRow.addView(valueLabel)
+        addReorderColumn(headerRow, btn)
         container.addView(headerRow)
 
         val seekBar = android.widget.SeekBar(this).apply {
@@ -225,6 +283,13 @@ class ControlsActivity : AppCompatActivity() {
         return container
     }
 
+    private fun handleMomentaryPress(btn: ControlButtonDef, pressed: Boolean) {
+        log("\"${btn.label}\" ${if (pressed) "pressed" else "released"} — sending...")
+        DeviceCommand.sendSet(btn.roleKey, pressed) { response ->
+            log(response ?: "\"${btn.label}\": no response (check connection)")
+        }
+    }
+
     private fun handleTap(btn: ControlButtonDef) {
         when (btn.controlType) {
             ControlType.TOGGLE -> {
@@ -237,13 +302,9 @@ class ControlsActivity : AppCompatActivity() {
                 }
             }
             ControlType.MOMENTARY -> {
-                // True press/release isn't wired yet (needs touch-down/up
-                // handling, not just a tap) — see PIN_MAPPER_ROADMAP.md.
-                // For now this just sends ON; nothing turns it back off.
-                log("\"${btn.label}\" pressed — sending...")
-                DeviceCommand.sendSet(btn.roleKey, true) { response ->
-                    log(response ?: "\"${btn.label}\": no response (check connection)")
-                }
+                // Never actually reached — MOMENTARY buttons use their
+                // own OnTouchListener (real press/release) instead of
+                // handleTap now. Kept for exhaustiveness.
             }
             ControlType.SLIDER -> {
                 // Never actually reached — slider rows use their own

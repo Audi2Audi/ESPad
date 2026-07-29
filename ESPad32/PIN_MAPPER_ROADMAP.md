@@ -42,6 +42,46 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Momentary buttons now have real press/release**, not just a
+      tap. Fixed in all three places momentary control lives: the
+      Controls screen's own button row, the main screen's live panel,
+      and gamepad-mapped `CUSTOM_CONTROL` buttons. Each now uses actual
+      touch-down/touch-up handling (`OnTouchListener` for on-screen,
+      `onKeyDown`/`onKeyUp` for gamepad) sending the real ON/OFF state
+      rather than always sending ON. **Found the same bug existed in
+      the gamepad path too** while fixing this — `onKeyUp` only ever
+      special-cased the old hardcoded horn function, never forwarded
+      release events for the generic `CUSTOM_CONTROL` path at all.
+      Fixed carefully so legacy `ButtonFunction` cases (LED_CYCLE,
+      PAN_LEFT, etc.) don't double-fire on release — only the horn and
+      `CUSTOM_CONTROL` cases get release events at all; everything else
+      still only reacts to press, unchanged.
+- [x] **Button reordering** — simple ▲▼ controls per row, not full
+      drag-and-drop. The button list is a plain rendered `LinearLayout`,
+      not a `RecyclerView`, so true drag gestures would need a bigger
+      migration than this deserves at the current scale (a handful of
+      buttons per profile). Swapping list position + re-saving gets the
+      actual value people want with much less risk. Works for both
+      toggle/momentary rows and slider rows. Reordering here
+      automatically reflects on the main screen's live panel too, since
+      that just reads whatever order is persisted.
+- [x] **Two more `BoardDef` entries: ESP32-S3 DevKitC-1, ESP32-C3
+      DevKitM-1.** Same "verify against your specific board" caveat as
+      the existing DevKit V1/ESP32-CAM entries — S3/C3 dev boards vary
+      between vendors/variants more than the original ESP32 does.
+      **Real gap discovered while adding these, not yet fixed:**
+      `PinValidation.ADC1_PINS` is a single hardcoded set
+      (`32/33/34/35/36/39`) — correct for the *original* ESP32, but
+      completely wrong for S3 (real ADC1 pins: roughly GPIO1-10) and C3
+      (real ADC1 pins: GPIO0-4). Right now, creating an `ANALOG_INPUT`
+      role on either new board would incorrectly reject their actual
+      valid ADC1 pins. Needs `PinValidation.canAssign()` to become
+      board-aware (an ADC1 set per `BoardDef`, not one global constant)
+      before Analog Input is trustworthy on anything but the original
+      ESP32-family boards. Flagging clearly rather than silently
+      shipping a board where that specific feature quietly misbehaves.
+
+
 - [x] **Found and removed a SECOND, independent copy of the dead
       Presets UI** — living in `SettingsDialogFragment.kt`'s own
       Controller tab, entirely separate from the copy already removed
@@ -455,14 +495,14 @@ to the phone directly). Revisit only if a specific project needs it.
       over assignments that are still valid (or previously saved for
       that profile+board combo) and clears/logs any that aren't
 - [x] ESP32 DevKit V1 (38-pin) added as second `BoardDef`
-- [ ] Add more ESP32-family `BoardDef` entries, roughly in likely-usefulness
+- [x] Add more ESP32-family `BoardDef` entries, roughly in likely-usefulness
       order:
       - [x] ESP32 DevKit V1 (generic 30-pin/38-pin dev board — probably
             the single most common alternative to the D1 Mini32)
-      - [ ] ESP32-S3 DevKit (newer, more GPIOs, native USB — worth it if
-            a future project needs more pins than the D1 Mini32 offers)
-      - [ ] ESP32-C3 (RISC-V, fewer pins, smaller/cheaper — good fit for
-            simple single-function builds)
+      - [x] ESP32-S3 DevKit (newer, more GPIOs, native USB) — added, see
+            the ADC1-awareness gap noted above
+      - [x] ESP32-C3 (RISC-V, fewer pins, smaller/cheaper) — added, same
+            ADC1-awareness gap
       - ESP8266 (NodeMCU etc.) is a different chip family with its own
         GPIO numbering/restrictions and no direct code reuse from the
         ESP32 validation rules — worth a note but treat as its own
@@ -503,14 +543,9 @@ to the phone directly). Revisit only if a specific project needs it.
       **SERVO roles still have no slider or firmware support at all** —
       angle control (`Servo.attach()`/`.write()`) is a different thing
       from PWM duty and hasn't been built; don't conflate the two.
-- [ ] Momentary buttons currently log on tap only — for a real "on
-      while held" feel this needs press/release touch handling
-      (`OnTouchListener`, not `OnClickListener`). Confirmed still true
-      as of the CUSTOM_CONTROL work — `executeCustomControlButton()`
-      sends ON on tap with an explicit comment that nothing turns it
-      back off yet.
-- [ ] Reordering buttons (drag-and-drop) once someone has more than a
-      handful — still not needed yet in practice, still not built.
+- [x] Momentary press/release — done, see the entry above.
+- [x] Reordering buttons — done, see the entry above (simple ▲▼, not
+      full drag-and-drop).
 
 ## Medium-term: user-defined device profiles
 
