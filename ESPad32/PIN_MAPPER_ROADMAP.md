@@ -42,6 +42,28 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Found and removed a SECOND, independent copy of the dead
+      Presets UI** — living in `SettingsDialogFragment.kt`'s own
+      Controller tab, entirely separate from the copy already removed
+      from `ControllerMappingActivity.kt`. Same root cause (canned
+      presets sending `CMD_MOTOR`/`CMD_CAMERA`), but a genuinely
+      different file/screen — missed in the first pass because it
+      wasn't the same code, just the same dead functionality
+      hand-duplicated in two places. Kept the legitimate "Open Full
+      Controller Mapping" navigation button in Settings' Controller
+      tab, just removed the redundant inline Presets list above it.
+      **Worth remembering as a pattern, not just a one-off:** this is
+      now the *second* time a Freenove-era feature turned out to be
+      duplicated between a dedicated screen and an embedded copy
+      inside Settings (the OTA flow was the first — `OtaActivity` vs.
+      a second copy in Settings' OTA tab, found much earlier). Checked
+      this time whether "Pin Ref" or any of the other removed CMD_*
+      commands (`CMD_LED_MOD`/`CMD_MATRIX_MOD`/`CMD_BUZZER`/
+      `CMD_CAR_MODE`/`CMD_POWER`) had a similar hidden twin in
+      `SettingsDialogFragment.kt` — confirmed clean, no other
+      duplicates found this time.
+
+
 - [x] **Removed the Controller Mapping "Presets" tab — same category as
       the Pin Ref tab, confirmed before touching anything.** All three
       canned presets (Default, Trigger Drive, D-Pad Drive) exclusively

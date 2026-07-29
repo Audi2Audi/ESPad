@@ -510,47 +510,14 @@ class SettingsDialogFragment : DialogFragment() {
 
     // ── Controller Tab — embedded controller mapping ──────────────────
     private fun buildControllerTab() {
-        // Presets
-        addSectionHeader("PRESETS")
-        ControllerMapping.PRESETS.forEach { profile ->
-            val isActive = profile.name == ControllerMapping.activeProfileName
-            val row = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.HORIZONTAL
-                setBackgroundColor(0xFF1A1A1A.toInt()); setPadding(16, 14, 16, 14)
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 4.dp }
-            }
-            val col = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-            col.addView(TextView(requireContext()).apply {
-                text = profile.name; textSize = 14f; setTextColor(0xFFFFFFFF.toInt()); setTypeface(null, android.graphics.Typeface.BOLD)
-            })
-            val drive = profile.axes.find { it.function == AxisFunction.DRIVE || it.function == AxisFunction.TRIGGER_DRIVE }?.label ?: "—"
-            val pan   = profile.axes.find { it.function == AxisFunction.PAN_TILT }?.label ?: "—"
-            col.addView(TextView(requireContext()).apply {
-                text = "Drive: $drive  |  Pan/Tilt: $pan"; textSize = 11f; setTextColor(0xFF888888.toInt())
-            })
-            val btn = Button(requireContext()).apply {
-                text = if (isActive) "✓ Active" else "Apply"
-                textSize = 12f; isAllCaps = false
-                setBackgroundResource(R.drawable.btn_car_bg)
-                setTextColor(if (isActive) 0xFF00E5FF.toInt() else 0xFFFFFFFF.toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    gravity = android.view.Gravity.CENTER_VERTICAL
-                }
-            }
-            btn.setOnClickListener {
-                ControllerMapping.applyPreset(profile)
-                buildControllerTab()
-            }
-            row.addView(col); row.addView(btn)
-            contentArea?.addView(row)
-        }
-
-        addDivider()
+        // Presets section removed — same reason as ControllerMappingActivity's
+        // "Presets" tab (see PIN_MAPPER_ROADMAP.md): all three canned
+        // presets used AxisFunction.DRIVE/TRIGGER_DRIVE/PAN_TILT, which
+        // send CMD_MOTOR/CMD_CAMERA - Freenove-specific commands this
+        // firmware doesn't understand. This was a SEPARATE, independent
+        // copy of that same dead UI living here in the Settings dialog's
+        // own Controller tab — missed in the first pass since it's a
+        // different file entirely from ControllerMappingActivity.
 
         // Open full mapping screen button
         val btnFullMapping = Button(requireContext()).apply {
