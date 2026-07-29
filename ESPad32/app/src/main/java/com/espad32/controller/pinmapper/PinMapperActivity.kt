@@ -896,4 +896,6 @@ class PinMapperActivity : AppCompatActivity() {
         if (logLines.size > 8) logLines.removeAt(logLines.size - 1)
         logText.text = logLines.joinToString("\n")
     }
+
+    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 }
