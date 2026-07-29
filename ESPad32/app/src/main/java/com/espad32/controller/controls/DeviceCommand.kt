@@ -60,6 +60,16 @@ object DeviceCommand {
     }
 
     /**
+     * Sends GET_CONFIG# — asks the device for its full role list
+     * (key/label/type/gpio) as JSON. Used by "Sync from Device" to pull
+     * in anything created via the device's own web UI, which the phone
+     * would otherwise have no way to find out about at all.
+     */
+    fun sendGetConfig(onResult: (String?) -> Unit) {
+        sendRaw("GET_CONFIG#\n", onResult)
+    }
+
+    /**
      * Sends any single-line command (a SET command, or a full JSON pin
      * config payload — both are just one line ending in \n) and captures
      * the device's first response line. For multi-line firmware replies

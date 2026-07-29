@@ -118,6 +118,19 @@
                 android:textColor="#1A1408" />
         </LinearLayout>
 
+        <!-- Pulls whatever's on the device right now (e.g. created via
+             its own web UI) into this phone's local storage for the
+             current profile — the reverse direction of Validate & Save,
+             not a live merge. Replaces, doesn't combine. -->
+        <Button
+            android:id="@+id/syncFromDeviceButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="⬇ Sync from Device"
+            android:backgroundTint="#181D23"
+            android:textColor="#8A939C"
+            android:layout_marginTop="8dp" />
+
         <!-- Log console -->
         <TextView
             android:layout_width="wrap_content"

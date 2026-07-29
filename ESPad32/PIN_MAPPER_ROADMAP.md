@@ -43,6 +43,73 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Option A built: device-hosted web UI, full version (create,
+      not just adjust) with two-way sync.** The bigger, more honest
+      scope was chosen deliberately over a narrower "web UI can only
+      tweak pins for functions the phone already knows about" version
+      — see the design discussion this required first.
+      **The core problem this had to solve:** the phone was the ONLY
+      place that knew what a function *is* — firmware only ever stored
+      `role → gpio`, nothing about type or label. A function created
+      independently on the device (via the new web page) would be
+      invisible to the phone app with no way to find out it existed.
+      **The model adopted: explicit one-way sync in both directions,
+      like `git push`/`git pull` — not live bidirectional merging.**
+      Validate & Save was already the push (phone → device); this adds
+      an explicit **pull** (device → phone), a deliberate user action
+      that REPLACES the phone's local copy for that profile, not a
+      background merge.
+      - **Firmware storage extended** (`pin_store.h`) — now persists
+        `label` and `type` per role, not just `role`/`gpio`.
+        Backward-compatible: pre-v11 saves (or a minimal payload that
+        only sends role+gpio) default to `type=DIGITAL_OUTPUT` and
+        `label=<role key>` when those NVS keys don't exist, rather than
+        failing.
+      - **New `GET_CONFIG#` TCP command** — reports the full role list
+        as JSON (key/label/type/gpio), used by the web page itself and
+        by the phone's new sync feature.
+      - **New device-hosted web page** (`webui.h`), port 8081 (kept
+        separate from OTA's 8080 — chunked-binary-upload handling and
+        small-JSON-API handling are two different things, simpler kept
+        apart). Plain HTML/vanilla JS, no external dependencies (the AP
+        has no internet access, so a CDN script would just fail).
+        `GET /`, `GET /api/config`, `POST /api/config` (add/update, run
+        through the same `validateGpio()` the JSON-payload path uses),
+        `POST /api/delete`.
+      - **JSON payload (phone → device) now also carries label/type**,
+        not just role/gpio — so a function created via the PHONE is
+        just as fully described on the device as one created via the
+        web UI. `PinConfigStorage.buildPayload()` now takes the
+        resolved roles list to populate these.
+      - **Closed a previously-flagged gap as a natural side effect**:
+        firmware's `validateGpio()` had no concept of role type at all
+        before this (it used a hardcoded-role-name placeholder
+        heuristic predating the real type system). Since type now
+        genuinely flows through, replaced that placeholder with real
+        ADC1-only enforcement for `ANALOG_INPUT`, matching the app's
+        `PinValidation.ADC1_PINS` exactly — firmware is no longer the
+        only side that DOESN'T check this.
+      - **App: "Sync from Device"** — a new button in Pin Mapper
+        (`⬇ Sync from Device`, next to Validate & Save), with an
+        explicit confirmation dialog spelling out that it replaces the
+        phone's local copy for the active profile, since this is a
+        genuinely destructive pull, not a safe background refresh.
+      **Known limitation, inherited from the existing architecture, not
+      introduced by this work:** the device still only has ONE flat
+      config, always saved under a hardcoded `"train"` NVS namespace —
+      it has no real concept of "which phone-side profile" it belongs
+      to. Fine for a single test rig; would need genuine multi-profile
+      awareness on the firmware side to mean more than that.
+      **Not yet tested against real hardware** — Dave was away from
+      the ESP32 for this whole build. The code is internally consistent
+      and each piece reuses proven patterns (the OTA server's raw-HTTP
+      approach, the existing JSON payload/validation path), but the
+      full loop — web UI → GET_CONFIG → Sync from Device → Pin Mapper
+      showing the result — needs a real end-to-end run once hardware's
+      available again.
+
+
+
 - [x] **Real servo angle control, end to end.** The last major gap
       blocking the full-circle Freenove-car test — servo is genuinely
       different from PWM duty (a ~50Hz signal with pulse width mapped
@@ -367,40 +434,38 @@ core R/C functionality from scratch.
       no clean "this profile's gamepad mappings" to export today. A
       real limitation, not an oversight.
 
-## Future idea, not started
+## Future idea, partially built
 
 - **Two different hosting models for the "PC-based profile creator"
   idea — worth comparing rather than assuming one is obviously right:**
 
-  **Option A — self-hosted on the ESP32 itself (favored as the nearer-
-  term option).** Once the default sketch is flashed, visiting the
-  device's own IP in a browser shows a page for creating/editing
-  functions and pin mappings, directly on the device — no separate
-  export/import round-trip needed at all, since the page could just
-  read/write the device's own stored config in real time. This reuses
-  infrastructure already built and proven: the OTA HTTP server (`ota.h`)
-  already established the pattern of a raw `WiFiServer`-based request
-  handler on this firmware, which a small config-editing page could
-  extend (serve a lightweight HTML/vanilla-JS page, plus simple
-  endpoints to read/write the same JSON pin-config format the app
-  already sends over the TCP command channel).
-  - *Pros:* zero external hosting/maintenance, works fully offline on
-    the device's own local AP (matches the existing "AP always up"
-    philosophy), always talking to the actual physical device rather
-    than a disconnected builder that syncs later, no new
-    infrastructure beyond what this firmware already does.
-  - *Cons:* ESP32 has limited RAM/flash for a rich UI — needs to stay
-    genuinely lightweight, same hand-rolled-HTTP constraints the OTA
-    server already lives with; only reachable from a PC on the same
-    network as that specific device (its AP, or the same LAN in STA
-    mode) — no "plan a profile before you own a device" workflow.
+  **Option A — self-hosted on the ESP32 itself. Built (see the "device-
+  hosted web UI" entry above) — with one difference from how it was
+  originally imagined.** Visiting the device's own IP:8081 in a browser
+  shows a page for creating/editing/deleting functions and pin
+  mappings directly on the device. The original framing said this
+  "could just read/write the device's own stored config in real time,
+  no separate export/import round-trip needed at all" — that turned
+  out to undersell the actual problem: the *device's* config and the
+  *phone's* config are two independently-writable copies with no live
+  sync between them, so an explicit pull ("Sync from Device") was
+  needed rather than everything just naturally staying in sync. Still
+  reuses the OTA server's proven raw-`WiFiServer`-HTTP pattern, exactly
+  as anticipated.
+  - *Pros, confirmed:* zero external hosting/maintenance, works fully
+    offline on the device's own local AP, always talking to the actual
+    physical device.
+  - *Cons, confirmed:* only reachable from the same network as that
+    specific device — no "plan a profile before you own a device"
+    workflow (that's still Option B's territory).
 
-  **Option B — a separately-hosted web service.** Covers two things
-  Option A can't: (1) flashing the default firmware to a brand-new
-  ESP32 from a PC with no Arduino IDE at all (browser-based, similar to
-  esphome/esp-web-tools style in-browser flashing via WebSerial), and
-  (2) building/editing a profile before you even own or have flashed a
-  device. Would use the same JSON export/import format already built,
+  **Option B — a separately-hosted web service. Still not started.**
+  Covers two things Option A can't: (1) flashing the default firmware
+  to a brand-new ESP32 from a PC with no Arduino IDE at all (browser-
+  based, similar to esphome/esp-web-tools style in-browser flashing via
+  WebSerial), and (2) building/editing a profile before you even own or
+  have flashed a device. Would use the same JSON export/import format
+  already built,
   so it could interoperate with both the app and Option A without
   needing either to change.
   - *Pros:* works with zero hardware in hand, one central place

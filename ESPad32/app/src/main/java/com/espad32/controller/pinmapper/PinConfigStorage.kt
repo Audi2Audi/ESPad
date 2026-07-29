@@ -56,13 +56,20 @@ class PinConfigStorage(context: Context) {
      * ESPad_PinConfig_Test.ino expects, e.g.:
      * {"profile":"train","version":1,"pins":{"motor_dir_a":{"gpio":26,"role":"motor_dir_a"}, ...}}
      */
-    fun buildPayload(profile: DeviceProfile, assignments: Map<String, Int?>): JSONObject {
+    fun buildPayload(profile: DeviceProfile, assignments: Map<String, Int?>, roles: List<PinRoleDef> = emptyList()): JSONObject {
         val pins = JSONObject()
         assignments.forEach { (role, gpio) ->
             if (gpio != null) {
                 val entry = JSONObject()
                 entry.put("gpio", gpio)
                 entry.put("role", role)
+                // v11: also send label/type, so the device's own config
+                // (readable via GET_CONFIG, editable via the web UI) is
+                // just as fully described for phone-created functions as
+                // it is for ones created directly on the device.
+                val matched = roles.find { it.key == role }
+                entry.put("label", matched?.label ?: role)
+                entry.put("type", matched?.type?.name ?: "DIGITAL_OUTPUT")
                 pins.put(role, entry)
             }
         }

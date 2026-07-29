@@ -11,6 +11,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Spinner
+import org.json.JSONArray
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.espad32.controller.R // adjust if your R class lives elsewhere
@@ -54,6 +55,7 @@ class PinMapperActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.resetButton).setOnClickListener { resetDefaults() }
         findViewById<Button>(R.id.saveButton).setOnClickListener { validateAndSave() }
+        findViewById<Button>(R.id.syncFromDeviceButton).setOnClickListener { confirmSyncFromDevice() }
         findViewById<Button>(R.id.addRoleButton).setOnClickListener { showAddRoleDialog() }
 
         buildProfileTabs()
@@ -884,7 +886,7 @@ class PinMapperActivity : AppCompatActivity() {
         }
 
         storage.save(currentProfile.key, currentBoardKey, assignments)
-        val payload = storage.buildPayload(currentProfile, assignments)
+        val payload = storage.buildPayload(currentProfile, assignments, effectiveRoles())
         log("Saved locally for board \"${Boards.byKey(currentBoardKey).displayName}\".")
         log("Sending to device...")
 
@@ -902,6 +904,65 @@ class PinMapperActivity : AppCompatActivity() {
         logLines.add(0, message)
         if (logLines.size > 8) logLines.removeAt(logLines.size - 1)
         logText.text = logLines.joinToString("\n")
+    }
+
+    // ── Sync from Device ────────────────────────────────────────────────
+    // The reverse direction of Validate & Save — pulls whatever's
+    // currently on the device (e.g. created via its own web UI, a
+    // separate way to add functions this app has no other way of
+    // learning about) into this phone's local storage for the active
+    // profile. Deliberately a one-way REPLACE, not a live merge — same
+    // spirit as a git pull, not real-time bidirectional sync. Confirmed
+    // explicitly before doing anything, since it overwrites local state.
+    private fun confirmSyncFromDevice() {
+        AlertDialog.Builder(this)
+            .setTitle("Sync from Device?")
+            .setMessage(
+                "This replaces \"${currentProfile.displayName}\"'s functions and pin " +
+                "assignments on THIS PHONE with whatever's currently saved on the " +
+                "device itself — including anything created through the device's own " +
+                "web UI. Anything only saved locally on the phone (and not also on the " +
+                "device) will be lost. This does not touch the device — only pulls " +
+                "from it."
+            )
+            .setPositiveButton("Sync") { _, _ -> performSyncFromDevice() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performSyncFromDevice() {
+        log("Requesting config from device...")
+        com.espad32.controller.controls.DeviceCommand.sendGetConfig { response ->
+            if (response == null) {
+                log("No response from device (check connection).")
+                return@sendGetConfig
+            }
+            try {
+                val arr = JSONArray(response)
+                val syncedRoles = mutableListOf<CustomRole>()
+                val syncedAssignments = mutableMapOf<String, Int?>()
+
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val key = o.getString("role")
+                    val label = o.optString("label", key)
+                    val typeStr = o.optString("type", "DIGITAL_OUTPUT")
+                    val type = try { RoleType.valueOf(typeStr) } catch (e: Exception) { RoleType.DIGITAL_OUTPUT }
+                    val gpio = o.getInt("gpio")
+
+                    syncedRoles.add(CustomRole(key, label, "Custom", type))
+                    syncedAssignments[key] = gpio
+                }
+
+                customRoleStorage.saveCustomRoles(currentProfile.key, syncedRoles)
+                storage.save(currentProfile.key, currentBoardKey, syncedAssignments)
+
+                log("Synced ${syncedRoles.size} function(s) from device.")
+                loadProfile(currentProfile) // refresh the screen with synced state
+            } catch (e: Exception) {
+                log("Sync failed — couldn't parse device response: ${e.message}")
+            }
+        }
     }
 
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
