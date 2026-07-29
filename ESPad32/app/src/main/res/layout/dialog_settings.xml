@@ -3,7 +3,26 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0A0A0A">
+    android:background="#0A0A0A"
+    android:fitsSystemWindows="true">
+
+    <!-- Header — matches Controller Mapping's style for visual
+         consistency. Also functionally necessary now that this screen
+         fills the whole display: previously the dialog only took up
+         ~95%/80% of the screen, so tapping the visible area outside it
+         was how you'd dismiss it. Filling the screen removes that
+         "outside" area entirely, so an explicit Close button is the
+         real dismiss affordance now (back gesture still works too). -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:background="#1A1A1A"
+        android:padding="12dp" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="⚙  Settings"
+            android:textColor="#00E5FF" android:textSize="16sp" android:textStyle="bold"/>
+        <Button android:id="@+id/btnSettingsClose"
+            android:layout_width="wrap_content" android:layout_height="32dp"
+            android:text="✕ Close" android:textSize="12sp" style="@style/CarButton"/>
+    </LinearLayout>
 
     <!-- Top bar: IP + Joystick toggle -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"

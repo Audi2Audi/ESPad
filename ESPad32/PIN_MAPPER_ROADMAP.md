@@ -42,6 +42,42 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Removed the Controller Mapping "Presets" tab — same category as
+      the Pin Ref tab, confirmed before touching anything.** All three
+      canned presets (Default, Trigger Drive, D-Pad Drive) exclusively
+      used `AxisFunction.DRIVE`/`TRIGGER_DRIVE`/`STEER_ONLY`/`PAN_TILT`,
+      which dispatch to `CMD_MOTOR`/`CMD_CAMERA` — the same Freenove-
+      specific command family as everything else already removed this
+      session (LED, buzzer, car mode, power). Applying any of them
+      would silently do nothing against this firmware. Verified
+      `ControllerMapping.init()` doesn't depend on the Presets/
+      `ControllerProfile` system before removing the UI — per-button/
+      per-axis mappings (`CUSTOM_CONTROL`/`CUSTOM_PWM`, the ones that
+      actually work) persist independently via their own JSON storage,
+      so nothing about actual saved mappings was at risk.
+      Removed the tab, renumbered the remaining three (Buttons/Axes/
+      Advanced now 0/1/2), and updated every `showTab()` call site
+      accordingly.
+      **Left as-is, noted as a smaller follow-up:** the underlying
+      `ControllerProfile`/`PRESETS`/`applyPreset` data layer in
+      `ControllerMapping.kt` is now unreachable dead code, not yet
+      fully removed — the UI was the actively misleading part users
+      interact with; the data-layer cleanup is lower-value and lower-
+      risk to leave for later.
+- [x] **Settings dialog now genuinely fills the screen**, matching
+      Controller Mapping's presentation (previously ~95%/80% width/
+      height, with visible dim area around it used for tap-to-dismiss).
+      Added a matching header (icon + title + explicit "✕ Close"
+      button) — this became functionally necessary, not just cosmetic:
+      filling the screen removes the "outside the dialog" area
+      entirely, so there was no longer any visible surface left to tap
+      for dismissal without it. New `FullscreenDialogTheme` strips the
+      default dialog theme's floating-window chrome (dim border,
+      rounded corners) that `setLayout(MATCH_PARENT, MATCH_PARENT)`
+      alone doesn't remove, applied via `setStyle()` in a new
+      `onCreate()` override.
+
+
 - [x] **Removed the Settings dialog's Save/Close buttons — they were
       already functionally redundant with each other and with simply
       closing the dialog.** Investigation before touching anything:

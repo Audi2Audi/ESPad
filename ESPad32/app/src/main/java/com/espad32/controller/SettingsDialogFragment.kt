@@ -72,6 +72,11 @@ class SettingsDialogFragment : DialogFragment() {
     private var currentTab = 0
     private var pickBinLauncher: ((ByteArray) -> Unit)? = null
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, R.style.FullscreenDialogTheme)
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
                                savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.dialog_settings, container, false)
@@ -95,6 +100,8 @@ class SettingsDialogFragment : DialogFragment() {
         tabTheme?.setOnClickListener      { showTab(1) }
         tabController?.setOnClickListener { showTab(2) }
         tabOta?.setOnClickListener        { showTab(3) }
+
+        view.findViewById<Button>(R.id.btnSettingsClose)?.setOnClickListener { dismiss() }
 
         view.findViewById<Button>(R.id.btnSearchDevices)?.setOnClickListener {
             searchForDevices()
@@ -915,8 +922,8 @@ class SettingsDialogFragment : DialogFragment() {
     override fun onStart() {
         super.onStart()
         dialog?.window?.setLayout(
-            (resources.displayMetrics.widthPixels * 0.95).toInt(),
-            (resources.displayMetrics.heightPixels * 0.80).toInt()
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
         )
     }
 }

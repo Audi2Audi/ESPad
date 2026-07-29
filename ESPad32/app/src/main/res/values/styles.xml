@@ -13,4 +13,18 @@
         <item name="android:textAllCaps">false</item>
         <item name="android:paddingHorizontal">4dp</item>
     </style>
+
+    <!-- Genuine edge-to-edge dialog presentation, matching how
+         ControllerMappingActivity fills the screen — the default
+         dialog theme keeps floating-window chrome (dim border, rounded
+         corners) even when resized to MATCH_PARENT dimensions, so this
+         explicitly strips that out instead. -->
+    <style name="FullscreenDialogTheme" parent="Theme.AppCompat.Dialog">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">#0A0A0A</item>
+        <item name="android:windowFrame">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
 </resources>

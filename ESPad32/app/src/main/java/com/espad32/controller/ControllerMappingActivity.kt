@@ -8,7 +8,6 @@ import androidx.appcompat.app.AppCompatActivity
 
 class ControllerMappingActivity : AppCompatActivity() {
 
-    private lateinit var tabPresets: TextView
     private lateinit var tabButtons: TextView
     private lateinit var tabAxes: TextView
     private lateinit var tabAdvanced: TextView
@@ -22,16 +21,14 @@ class ControllerMappingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_controller_mapping)
 
-        tabPresets  = findViewById(R.id.tabPresets)
         tabButtons  = findViewById(R.id.tabButtons)
         tabAxes     = findViewById(R.id.tabAxes)
         tabAdvanced = findViewById(R.id.tabAdvanced)
         contentArea = findViewById(R.id.mappingContent)
 
-        tabPresets.setOnClickListener  { showTab(0) }
-        tabButtons.setOnClickListener  { showTab(1) }
-        tabAxes.setOnClickListener     { showTab(2) }
-        tabAdvanced.setOnClickListener { showTab(3) }
+        tabButtons.setOnClickListener  { showTab(0) }
+        tabAxes.setOnClickListener     { showTab(1) }
+        tabAdvanced.setOnClickListener { showTab(2) }
 
         findViewById<Button>(R.id.btnMappingClose).setOnClickListener { finish() }
 
@@ -41,42 +38,14 @@ class ControllerMappingActivity : AppCompatActivity() {
     private fun showTab(tab: Int) {
         val cyan = getColor(android.R.color.holo_blue_light)
         val grey = 0xFF888888.toInt()
-        listOf(tabPresets, tabButtons, tabAxes, tabAdvanced)
+        listOf(tabButtons, tabAxes, tabAdvanced)
             .forEachIndexed { i, tv -> tv.setTextColor(if (i == tab) cyan else grey) }
         contentArea.removeAllViews()
         when (tab) {
-            0 -> buildPresetsTab()
-            1 -> buildButtonsTab()
-            2 -> buildAxesTab()
-            3 -> buildAdvancedTab()
+            0 -> buildButtonsTab()
+            1 -> buildAxesTab()
+            2 -> buildAdvancedTab()
         }
-    }
-
-    // ── Presets tab ───────────────────────────────────────────────────
-    private fun buildPresetsTab() {
-        contentArea.removeAllViews()
-        ControllerMapping.PRESETS.forEach { profile ->
-            val row = layoutInflater.inflate(R.layout.item_preset_row, contentArea, false)
-            row.findViewById<TextView>(R.id.tvPresetName).text = profile.name
-            row.findViewById<TextView>(R.id.tvPresetDesc).text = presetDescription(profile)
-            val btn = row.findViewById<Button>(R.id.btnApplyPreset)
-            btn.text = if (profile.name == ControllerMapping.activeProfileName) "✓ Active" else "Apply"
-            btn.setOnClickListener {
-                ControllerMapping.applyPreset(profile)
-                buildPresetsTab()  // refresh
-                Toast.makeText(this, "${profile.name} applied", Toast.LENGTH_SHORT).show()
-            }
-            contentArea.addView(row)
-        }
-    }
-
-    private fun presetDescription(profile: ControllerProfile): String {
-        val drive = profile.axes.find {
-            it.function == AxisFunction.DRIVE ||
-            it.function == AxisFunction.TRIGGER_DRIVE
-        }?.label ?: "—"
-        val pan = profile.axes.find { it.function == AxisFunction.PAN_TILT }?.label ?: "—"
-        return "Drive: $drive  |  Pan/Tilt: $pan"
     }
 
     // ── Buttons tab ───────────────────────────────────────────────────
@@ -147,7 +116,7 @@ class ControllerMappingActivity : AppCompatActivity() {
                     showCustomControlPicker(index, mapping)
                 } else {
                     ControllerMapping.updateButton(index, selected, this)
-                    showTab(1)
+                    showTab(0)
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -177,7 +146,7 @@ class ControllerMappingActivity : AppCompatActivity() {
             .setTitle("Which button?")
             .setItems(labels) { _, itemIndex ->
                 ControllerMapping.updateButton(index, ButtonFunction.CUSTOM_CONTROL, this, buttons[itemIndex].id)
-                showTab(1)
+                showTab(0)
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -263,7 +232,7 @@ class ControllerMappingActivity : AppCompatActivity() {
                     showCustomPwmPicker(index, mapping)
                 } else {
                     ControllerMapping.updateAxis(index, selected, this)
-                    showTab(2)
+                    showTab(1)
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -295,7 +264,7 @@ class ControllerMappingActivity : AppCompatActivity() {
             .setTitle("Which slider?")
             .setItems(labels) { _, itemIndex ->
                 ControllerMapping.updateAxis(index, AxisFunction.CUSTOM_PWM, this, buttons[itemIndex].id)
-                showTab(2)
+                showTab(1)
             }
             .setNegativeButton("Cancel", null)
             .show()
