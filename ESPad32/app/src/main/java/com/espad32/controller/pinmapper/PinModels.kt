@@ -67,7 +67,15 @@ data class BoardDef(
     // property of the physical board itself (marked RESERVED below on
     // camera-capable boards), not something a user assigns like any
     // other function.
-    val supportsCamera: Boolean = false
+    val supportsCamera: Boolean = false,
+    // Which pins are ADC1 (reliable with WiFi active) on THIS chip —
+    // genuinely different between chip families, not just a global
+    // ESP32 constant. Originally hardcoded as one global set correct
+    // only for the original ESP32; that quietly meant Analog Input
+    // creation on the S3/C3 boards would reject their actual valid
+    // pins, since neither uses the same ADC1 numbering. Defaults to
+    // the original ESP32's set for any board that doesn't override it.
+    val adc1Pins: Set<Int> = setOf(32, 33, 34, 35, 36, 39)
 ) {
     fun allPins(): List<BoardPin> = leftHeader + rightHeader
     fun findByGpio(gpio: Int): BoardPin? = allPins().find { it.gpio == gpio }
@@ -275,7 +283,12 @@ object Boards {
             BoardPin("21", 21, PinStatus.AVAILABLE),
             BoardPin("20 (USB D+)", 20, PinStatus.STRAPPING), // native USB if used - risky to repurpose
             BoardPin("19 (USB D-)", 19, PinStatus.STRAPPING)  // native USB if used - risky to repurpose
-        )
+        ),
+        // S3's ADC1 is GPIO1-10 — completely different from the
+        // original ESP32's 32/33/34/35/36/39. Getting this wrong meant
+        // Analog Input creation on this board would reject its actual
+        // valid pins.
+        adc1Pins = setOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     )
 
     // ESP32-C3-DevKitM-1 — RISC-V, single core, fewer pins, cheaper.
@@ -306,7 +319,10 @@ object Boards {
             BoardPin("20 (RX0)", 20, PinStatus.UART),
             BoardPin("18", 18, PinStatus.AVAILABLE),
             BoardPin("19", 19, PinStatus.AVAILABLE)
-        )
+        ),
+        // C3's ADC1 is GPIO0-4 — again, nothing like the original
+        // ESP32's numbering.
+        adc1Pins = setOf(0, 1, 2, 3, 4)
     )
 
     val ALL = listOf(D1_MINI32, ESP32_DEVKIT_V1, ESP32_CAM_AI_THINKER, ESP32_S3_DEVKIT, ESP32_C3_DEVKIT)

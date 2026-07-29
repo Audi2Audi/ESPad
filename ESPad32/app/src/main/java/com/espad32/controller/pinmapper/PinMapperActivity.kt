@@ -540,7 +540,7 @@ class PinMapperActivity : AppCompatActivity() {
             return
         }
 
-        val result = PinValidation.canAssign(pin, roleType)
+        val result = PinValidation.canAssign(pin, roleType, board.adc1Pins)
         if (!result.ok) {
             log("NACK — GPIO $newGpio rejected: ${result.reason}")
             return
@@ -661,7 +661,7 @@ class PinMapperActivity : AppCompatActivity() {
             }
             board.allPins().forEach { pin ->
                 val pinGpio = pin.gpio ?: return@forEach
-                if (PinValidation.canAssign(pin, role.type).ok) {
+                if (PinValidation.canAssign(pin, role.type, board.adc1Pins).ok) {
                     val label = if (PinValidation.isRisky(pin)) "GPIO $pinGpio ⚠" else "GPIO $pinGpio"
                     add(label to pinGpio)
                 }
@@ -794,12 +794,13 @@ class PinMapperActivity : AppCompatActivity() {
         // Servo now genuinely supported — real angle control (SETA,
         // 0-180 degrees) via the ESP32Servo library, not just PWM duty
         // reinterpreted as an angle. See PIN_MAPPER_ROADMAP.md.
+        val currentAdc1Pins = Boards.byKey(currentBoardKey).adc1Pins.sorted().joinToString("/")
         val noteText = TextView(this).apply {
             text = "On/Off backs a toggle button in Controls. PWM backs a slider " +
                 "(0-255). Servo backs a slider too, but 0-180 degrees, sent as a " +
                 "real angle command. Analog In reads a live voltage — e.g. battery " +
                 "level via your own voltage divider — and can only go on an ADC1 " +
-                "pin (32/33/34/35/36/39, marked available in the diagram above)."
+                "pin ($currentAdc1Pins on this board, marked available in the diagram above)."
             textSize = 11f
             setTextColor(Color.parseColor("#5F6A73"))
             setPadding(0, 20, 0, 0)

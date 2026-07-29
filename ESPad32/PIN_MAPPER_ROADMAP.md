@@ -260,17 +260,19 @@ core R/C functionality from scratch.
       DevKitM-1.** Same "verify against your specific board" caveat as
       the existing DevKit V1/ESP32-CAM entries — S3/C3 dev boards vary
       between vendors/variants more than the original ESP32 does.
-      **Real gap discovered while adding these, not yet fixed:**
-      `PinValidation.ADC1_PINS` is a single hardcoded set
+      **Real gap discovered while adding these — since fixed.**
+      `PinValidation.ADC1_PINS` was a single hardcoded set
       (`32/33/34/35/36/39`) — correct for the *original* ESP32, but
-      completely wrong for S3 (real ADC1 pins: roughly GPIO1-10) and C3
-      (real ADC1 pins: GPIO0-4). Right now, creating an `ANALOG_INPUT`
-      role on either new board would incorrectly reject their actual
-      valid ADC1 pins. Needs `PinValidation.canAssign()` to become
-      board-aware (an ADC1 set per `BoardDef`, not one global constant)
-      before Analog Input is trustworthy on anything but the original
-      ESP32-family boards. Flagging clearly rather than silently
-      shipping a board where that specific feature quietly misbehaves.
+      completely wrong for S3 (real ADC1 pins: GPIO1-10) and C3 (real
+      ADC1 pins: GPIO0-4). `BoardDef` now carries its own `adc1Pins`
+      set (same pattern as `supportsCamera`), and `canAssign()` takes
+      it as a parameter instead of reaching for one global constant —
+      all three call sites (Pin Mapper's assign flow, its dropdown
+      filter, the wizard's pin filter) updated to pass the actual
+      board's set. The firmware side of this same gap (its own
+      `validateGpio()` not knowing about ADC1 at all) was already
+      closed as part of the web UI work — this closes the matching
+      app-side half.
 
 
 - [x] **Found and removed a SECOND, independent copy of the dead

@@ -189,7 +189,7 @@ class DeviceWizardActivity : AppCompatActivity() {
             return board.allPins().mapNotNull { pin ->
                 val gpio = pin.gpio ?: return@mapNotNull null
                 if (gpio in takenPins) return@mapNotNull null // already used by an earlier function this session
-                if (!PinValidation.canAssign(pin, selectedType).ok) return@mapNotNull null
+                if (!PinValidation.canAssign(pin, selectedType, board.adc1Pins).ok) return@mapNotNull null
                 val label = if (PinValidation.isRisky(pin)) "GPIO $gpio ⚠" else "GPIO $gpio"
                 label to gpio
             }

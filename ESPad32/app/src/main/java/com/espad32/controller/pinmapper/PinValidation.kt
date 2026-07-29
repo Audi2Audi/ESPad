@@ -9,14 +9,15 @@ object PinValidation {
 
     data class Result(val ok: Boolean, val reason: String? = null)
 
-    // ESP32 has two ADC units. ADC1 (these 6 pins) works reliably
-    // whether or not WiFi is active. ADC2 pins are shared with the WiFi
-    // radio's internal use and give unreliable/blocked readings whenever
-    // WiFi is on — which for this app is always (AP is permanently up).
-    // So ANALOG_INPUT roles are restricted to ADC1 pins only.
+    // Kept as the DEFAULT for canAssign's adc1Pins param (matches
+    // BoardDef.adc1Pins' own default) — not used directly anymore.
+    // Was previously the only ADC1 set that existed at all, silently
+    // wrong for any non-original-ESP32 board (S3/C3 use completely
+    // different ADC1 numbering) until BoardDef gained its own
+    // per-board adc1Pins field.
     val ADC1_PINS = setOf(32, 33, 34, 35, 36, 39)
 
-    fun canAssign(pin: BoardPin, roleType: RoleType): Result {
+    fun canAssign(pin: BoardPin, roleType: RoleType, adc1Pins: Set<Int> = ADC1_PINS): Result {
         if (pin.gpio == null) {
             return Result(false, "Not a GPIO pin")
         }
@@ -24,8 +25,8 @@ object PinValidation {
             return Result(false, "Reserved for onboard flash")
         }
         if (roleType == RoleType.ANALOG_INPUT) {
-            if (!ADC1_PINS.contains(pin.gpio)) {
-                return Result(false, "Analog input needs an ADC1 pin (32/33/34/35/36/39) — other ADC pins conflict with WiFi")
+            if (!adc1Pins.contains(pin.gpio)) {
+                return Result(false, "Analog input needs an ADC1 pin (${adc1Pins.sorted().joinToString("/")}) — other ADC pins conflict with WiFi")
             }
             return Result(true)
         }
