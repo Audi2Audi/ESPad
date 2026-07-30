@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.InputDevice
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.SurfaceHolder
@@ -822,56 +823,160 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // gamepad's KeyEvent would, so whatever's mapped via Controller
     // Mapping works identically either way, and the app can be fully
     // driven without ever owning a physical gamepad.
+    // On-screen equivalents of the 12 physical gamepad buttons
+    // ControllerMapping already knows about (see ALL_BUTTONS) — tapping
+    // one calls the exact same handleGamepadButtonEvent() a real
+    // gamepad's KeyEvent would, so whatever's mapped via Controller
+    // Mapping works identically either way, and the app can be fully
+    // driven without ever owning a physical gamepad.
+    //
+    // Circular buttons in a diamond (face buttons) + stacked shoulder
+    // columns + a small utility row, replacing the earlier flat 4-per-
+    // row rectangular grid per direct feedback that it looked cramped.
     private fun renderVirtualButtons() {
         val container = findViewById<LinearLayout>(R.id.virtualButtonsContainer) ?: return
         container.removeAllViews()
+        container.orientation = LinearLayout.HORIZONTAL
+        container.gravity = Gravity.CENTER_VERTICAL
 
-        val perRow = 4
-        var rowLayout: LinearLayout? = null
+        fun vGap(heightDp: Int) = android.view.View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(1), dp(heightDp))
+        }
+        fun hGap(widthDp: Int) = android.view.View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(widthDp), dp(1))
+        }
 
-        ControllerMapping.buttons.forEachIndexed { index, mapping ->
-            if (index % perRow == 0) {
-                rowLayout = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { bottomMargin = dp(4) }
-                }
-                container.addView(rowLayout)
+        // A circle + an optional small caption underneath showing what
+        // it's actually mapped to (resolves CUSTOM_CONTROL to the real
+        // Controls button's label) — otherwise someone using this
+        // without a gamepad at all would see "A"/"B"/"X" with no idea
+        // what any of them do.
+        fun circleButton(keyCode: Int, sizeDp: Int, textSizeSp: Float): LinearLayout {
+            val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
+            val shortLabel = shortLabelForKeyCode(keyCode)
+            val targetLabel = mapping?.let { resolveVirtualButtonTarget(it) }
+
+            val wrapper = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                )
             }
-
-            val shortLabel = shortLabelForKeyCode(mapping.keyCode)
-            val targetLabel = resolveVirtualButtonTarget(mapping)
-
-            val btnView = Button(this).apply {
-                text = if (targetLabel != null) "$shortLabel\n$targetLabel" else shortLabel
-                textSize = 9f
+            val circle = Button(this).apply {
+                text = shortLabel
+                textSize = textSizeSp
                 isAllCaps = false
-                minWidth = 0
-                minimumWidth = 0
-                setPadding(6, 4, 6, 4)
-                alpha = 0.82f
-                setBackgroundColor(Color.parseColor("#33FFFFFF"))
-                setTextColor(Color.WHITE)
-                layoutParams = LinearLayout.LayoutParams(dp(58), dp(40)).apply { marginEnd = dp(4) }
+                minWidth = 0; minimumWidth = 0
+                minHeight = 0; minimumHeight = 0
+                setPadding(0, 0, 0, 0)
+                setBackgroundResource(R.drawable.virtual_button_circle)
+                setTextColor(Color.parseColor("#E7EBEE"))
+                alpha = 0.9f
+                layoutParams = LinearLayout.LayoutParams(dp(sizeDp), dp(sizeDp))
             }
-            btnView.setOnTouchListener { v, event ->
+            circle.setOnTouchListener { v, event ->
                 when (event.action) {
                     android.view.MotionEvent.ACTION_DOWN -> {
-                        handleGamepadButtonEvent(mapping.keyCode, true)
+                        handleGamepadButtonEvent(keyCode, true)
                         v.alpha = 1f
+                        v.setBackgroundColor(Color.parseColor("#8000E5FF"))
                         true
                     }
                     android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                        handleGamepadButtonEvent(mapping.keyCode, false)
-                        v.alpha = 0.82f
+                        handleGamepadButtonEvent(keyCode, false)
+                        v.alpha = 0.9f
+                        v.setBackgroundResource(R.drawable.virtual_button_circle)
                         true
                     }
                     else -> false
                 }
             }
-            rowLayout?.addView(btnView)
+            wrapper.addView(circle)
+            if (targetLabel != null) {
+                wrapper.addView(TextView(this).apply {
+                    text = targetLabel
+                    textSize = 8.5f
+                    setTextColor(Color.parseColor("#8A939C"))
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(dp(sizeDp + 20), LinearLayout.LayoutParams.WRAP_CONTENT)
+                    setPadding(0, 2, 0, 0)
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+            }
+            return wrapper
         }
+
+        // Left shoulder column — L1 above L2
+        val leftShoulders = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(14) }
+        }
+        leftShoulders.addView(circleButton(KeyEvent.KEYCODE_BUTTON_L1, 44, 11f))
+        leftShoulders.addView(vGap(10))
+        leftShoulders.addView(circleButton(KeyEvent.KEYCODE_BUTTON_L2, 44, 11f))
+
+        // Right shoulder column — R1 above R2
+        val rightShoulders = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginStart = dp(14) }
+        }
+        rightShoulders.addView(circleButton(KeyEvent.KEYCODE_BUTTON_R1, 44, 11f))
+        rightShoulders.addView(vGap(10))
+        rightShoulders.addView(circleButton(KeyEvent.KEYCODE_BUTTON_R2, 44, 11f))
+
+        // Center — face-button diamond (Y top, X/B middle row, A bottom),
+        // plus a small utility row (Select/L3/R3/Start) underneath.
+        val centerColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        centerColumn.addView(
+            circleButton(KeyEvent.KEYCODE_BUTTON_Y, 52, 13f).apply {
+                (layoutParams as LinearLayout.LayoutParams).gravity = Gravity.CENTER_HORIZONTAL
+            }
+        )
+        val xbRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        xbRow.addView(circleButton(KeyEvent.KEYCODE_BUTTON_X, 52, 13f))
+        xbRow.addView(hGap(56))
+        xbRow.addView(circleButton(KeyEvent.KEYCODE_BUTTON_B, 52, 13f))
+        centerColumn.addView(xbRow)
+        centerColumn.addView(
+            circleButton(KeyEvent.KEYCODE_BUTTON_A, 52, 13f).apply {
+                (layoutParams as LinearLayout.LayoutParams).gravity = Gravity.CENTER_HORIZONTAL
+            }
+        )
+
+        val utilityRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(10), 0, 0)
+        }
+        listOf(
+            KeyEvent.KEYCODE_BUTTON_SELECT,
+            KeyEvent.KEYCODE_BUTTON_THUMBL,
+            KeyEvent.KEYCODE_BUTTON_THUMBR,
+            KeyEvent.KEYCODE_BUTTON_START
+        ).forEach { kc ->
+            val b = circleButton(kc, 34, 8.5f)
+            (b.layoutParams as LinearLayout.LayoutParams).marginEnd = dp(8)
+            utilityRow.addView(b)
+        }
+        centerColumn.addView(utilityRow)
+
+        container.addView(leftShoulders)
+        container.addView(centerColumn)
+        container.addView(rightShoulders)
     }
 
     private fun shortLabelForKeyCode(keyCode: Int): String = when (keyCode) {

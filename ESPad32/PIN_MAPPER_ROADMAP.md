@@ -265,8 +265,15 @@ core R/C functionality from scratch.
         in `MainActivity.showSettings()`).
       - Renders all 12 physical buttons `ControllerMapping.ALL_BUTTONS`
         already knows about (A/B/X/Y, L1/R1/L2/R2, stick clicks, Start/
-        Select) as a compact 4-per-row grid, centered between the two
-        joysticks, above the control panel.
+        Select). **Visually redesigned since the first version** —
+        replaced a flat 4-per-row rectangular grid (feedback: looked
+        cramped/ugly) with circular buttons in a proper diamond
+        arrangement for the face buttons (Y top, X/B middle, A bottom),
+        stacked shoulder columns (L1/L2 left, R1/R2 right), and a
+        smaller utility row (Select/L3/R3/Start) underneath — modeled
+        on a reference screenshot of a similar circular-button remote
+        layout. New `virtual_button_circle.xml` drawable (thin cyan
+        outline, translucent dark fill) for the circles themselves.
       - **Labels show what's actually mapped**, not just raw button
         names — a `CUSTOM_CONTROL` button resolves to the real Controls
         button's label (e.g. shows "LED" under "A"), so someone using
