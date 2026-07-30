@@ -234,14 +234,18 @@ core R/C functionality from scratch.
       the right WiFi network is an OS-level phone setting outside the
       app's control; once the phone's already on the right network,
       the IP is the only thing worth remembering per device.
-- [x] **A deliberate device picker at session start.** On launch, if
-      more than one profile exists, a dialog asks "Which device are you
-      using?" before connecting — picking one sets `ActiveProfile` and,
-      if that device has a saved connection IP, switches to it
-      automatically. Skips the dialog entirely when there's nothing to
-      choose (0 or 1 profiles) — a picker with a single option would
-      just be annoying, not useful. Dismissing without picking just
-      connects with whatever was already set, rather than blocking.
+- [x] **Device selection at session start — since simplified.** Originally
+      showed a "Which device are you using?" dialog on every launch
+      whenever more than one profile existed. Changed per direct
+      feedback: the extra confirmation step was more friction than
+      help, since switching devices is already easy elsewhere (tapping
+      a different profile tab in Pin Mapper already sets
+      `ActiveProfile`). Now launch silently uses whichever profile was
+      active last time — no prompt — applying that device's saved
+      connection IP automatically if it has one, same as before, just
+      without asking first. `MainActivity.applyLastActiveProfileThenConnect()`
+      (renamed from the old picker-showing function, to avoid a
+      misleading name now that it doesn't show anything).
 
 
 - [x] **On-screen virtual gamepad buttons** — the app can now be fully
