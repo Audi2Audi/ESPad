@@ -84,6 +84,87 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **AUDIO_SIGNAL — the first real test of a "driver beyond simple
+      GPIO" role type, built per direct request** (v15 firmware,
+      delivered as a zip; app-side changes pushed as commit
+      `d769fca`). Deliberately scoped down from a general audio system:
+      ONE FIXED, embedded clip baked into flash, not dynamically
+      loadable sounds — that needs SD card support first (a separate,
+      larger piece of work, see the driver-abstraction entry above).
+      This proves the *pattern* — a role that isn't simple GPIO — not
+      the hardest part of a general system (dynamic bus-sharing the
+      way PCA9685 would need).
+      - **Firmware**: new `audio_signal.h`, using the *modern*
+        `driver/i2s_std.h` API (`i2s_new_channel`/
+        `i2s_channel_init_std_mode`/`i2s_channel_write`) — confirmed
+        against ESP-IDF's own official docs before writing anything,
+        since the legacy `driver/i2s.h` is deprecated on Arduino-ESP32
+        core 3.x (proven already in use here via `ledcAttach`'s
+        simplified API). Pins (BCLK=26, LRCLK=25, DIN=22) come from a
+        real, tested MAX98357A wiring example found during research,
+        not arbitrary numbers — still needs checking against the
+        Train's actual physical wiring before relying on it, same
+        caveat as every other board-pin assumption in this project.
+      - **The clip itself is a synthesized descending tone sweep
+        (900Hz->450Hz, 0.6s), generated in Python — explicitly NOT a
+        real train whistle recording**, purely to prove the playback
+        mechanism works end to end. ~18.8KB embedded in flash. Swap in
+        a real recording later by regenerating the same byte array
+        from an actual WAV file.
+      - **Deliberate shortcut, clearly documented rather than left as
+        a silent surprise**: AUDIO_SIGNAL roles don't have a real "pin"
+        the way other role types do — the 3 I2S pins are fixed
+        firmware constants, not user-assignable via Pin Mapper or the
+        web UI for this first test. A role's stored "gpio" value is
+        instead reinterpreted as a clip index (only index 0 exists
+        right now). Avoided a `pin_store.h` schema change for a first
+        test rather than build the bigger multi-pin-role change this
+        would eventually need for real generality.
+      - **Closed two landmines this reinterpretation created**, found
+        while implementing rather than left for later: firmware's
+        `validateGpio()`/`board_allowsGpio()` and the web UI's
+        `/api/board/pins` endpoint would otherwise apply real chip/
+        board pin rules (reserved flash, board availability) to what's
+        actually a clip index — harmless today since clip index 0
+        happens to be a valid, unreserved value, but would have broken
+        confusingly for a hypothetical future clip index that
+        collided with a reserved GPIO number. Bypassed explicitly for
+        `AUDIO_SIGNAL` type in all three places rather than leave the
+        coincidence unexamined.
+      - **App side**: Pin Mapper's Add Function offers "Audio Signal"
+        as a 5th type, with no pin picker shown (explained in the note
+        text why) — auto-assigns the placeholder value on creation via
+        the existing `assignGpioToRole()` machinery, which happens to
+        work unmodified since clip index 0 coincides with a real (if
+        strapping-flagged) board pin. **Flagged as fragile for a
+        future second clip, not fixed further** — genuinely only
+        works by coincidence for index 0, and would need real handling
+        (a proper clip-index picker, not a board-diagram pin tap)
+        before a second clip could be added safely. Controls forces
+        AUDIO_SIGNAL to a Momentary trigger button — a persistent
+        Toggle state doesn't make sense for "play this sound once."
+        No changes needed to the actual touch-handling/send logic —
+        Momentary's existing press-sends-1/release-sends-0 behavior
+        already matches exactly what the firmware expects (1 triggers
+        playback, 0 is a harmless no-op).
+      - **Found and fixed genuinely stale seed data while implementing
+        this**: Train's profile had 3 separate `audio_bclk`/`audio_lrc`/
+        `audio_din` AUDIO_SIGNAL roles seeded early in the session,
+        before real support existed — assumed a completely different
+        model (each I2S pin as its own user-assignable role) than what
+        actually got built (fixed firmware pins, one role per clip).
+        Replaced with a single `whistle` role matching reality. **Only
+        fixes this for fresh seeds** — a profile that already ran the
+        old seed (flag-guarded to run once) keeps the 3 stale roles
+        until manually deleted; the seed-data fix doesn't retroactively
+        reach already-seeded local storage.
+      **Not yet tested against real hardware** — same honest caveat as
+      everything else built this session while away from the Train.
+      Good first thing to verify once wiring's confirmed: `SET whistle 1`
+      should produce an audible ~0.6s tone through the speaker.
+
+
+
 - [x] **Checked the Train's own hardware (TB6612FNG motor driver +
       MAX98357A audio DAC) for the same category of issue just found
       with the Freenove car's PCA9685/WS2812 — verified independently
@@ -111,11 +192,12 @@ originally written, now corrected above for motors/servos):**
         whistle/sound effects were meant to go through this framework,
         that's currently just as unreachable as the Freenove car's
         motors were, for the same underlying reason: a real streaming
-        subsystem this firmware has never had any support for. Not
-        assigned an option-space writeup yet (unlike the LED matrix
-        question) — logged here as confirmed-but-unaddressed, worth
-        its own proper option-space discussion if/when audio playback
-        becomes a real want rather than a hypothetical.
+        subsystem this firmware has never had any support for.
+        **Since addressed** — see the `AUDIO_SIGNAL` entry further down
+        this doc, a scoped-down first test (one fixed embedded clip,
+        not general dynamic audio) built specifically because this is
+        the part of the driver-abstraction question most relevant to
+        this project's actual origin as a train conversion.
 
 
 
