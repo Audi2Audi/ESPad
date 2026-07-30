@@ -16,30 +16,71 @@ web-based profile creator (see below) and servo support exist, use
 to build a profile that recreates the original Freenove 4WD car's
 core R/C functionality from scratch.
 
-**What that test would realistically cover, and what it wouldn't:**
-- ✅ **In scope, achievable with the generic framework:** drive motors
-  (direction + PWM speed — already works), pan/tilt camera servos
-  (real angle control now built — see the servo entry below; single-
-  axis servo control works, true dual-axis pan+tilt from one stick
-  would still need the differential/dual-axis mapping noted as not
-  yet built), a headlight or indicator LED (already works), a horn/
-  buzzer (already works via DIGITAL_OUTPUT or PWM_OUTPUT).
+**CORRECTION, based on confirmed evidence, not the assumption this
+section was originally written on:** the "✅ in scope, already works"
+claim below for motors and servos turned out to be wrong for the
+actual stock car. Verified directly from Freenove's own source
+(`Freenove_4WD_Car_Kit_for_ESP32` on GitHub, their `fnk0053-docs`
+tutorial): **all 4 wheel motors AND both pan/tilt servos are driven
+through a PCA9685 — an I2C PWM controller board — not direct ESP32
+GPIO pins at all.** Confirmed from their own setup code:
+`PCA9685_Setup(); //Initialize PCA9685 to control motor`, with servos
+on PCA9685 channels 0-7 and each wheel motor on its own channel pair.
+This framework's `SET`/`SETV`/`SETA` only know how to drive something
+wired directly to a GPIO — they have no way to talk to a PCA9685 at
+all. That's not a missing profile or a missing pin assignment, it's a
+**missing firmware capability** — this device has never had any I2C
+peripheral support, same underlying gap as the LED matrix question
+logged separately above, just blocking the part of the car that
+actually matters most (driving and looking around), not an accessory.
+**This means the "full circle" milestone is currently blocked on
+PCA9685 I2C PWM support existing at all — servo angle support (already
+built) doesn't help here, since it's built for GPIO-attached servos,
+not ones behind an I2C PWM expander.**
+
+**What IS genuinely direct-GPIO on the stock car, also confirmed from
+the same source, and would work with the current framework as-is,
+right now, with no new firmware:**
+- **Buzzer/horn** — GPIO2, driven via the ESP32's own PWM
+  (`PWM_OUTPUT` role — works today).
+- **Battery voltage** — GPIO32, a plain ADC read (`ANALOG_INPUT` role
+  — works today, and is already one of the confirmed ADC1 pins).
+
+**What that test would realistically cover, and what it wouldn't (as
+originally written, now corrected above for motors/servos):**
+- ❌ **Motors and pan/tilt servos — NOT achievable without new
+  firmware** (PCA9685 I2C PWM support doesn't exist yet — see the
+  correction above). This is the actual core of "driving the car,"
+  and it's a bigger, more fundamental blocker than previously scoped.
+- ✅ A headlight or indicator LED, if wired to a spare direct GPIO
+  (already works) — the buzzer/horn already works via a real,
+  confirmed direct-GPIO pin on the stock board (GPIO2, see above).
 - ❌ **Likely permanently out of scope, and worth being upfront about
   that now rather than treating it as a gap to eventually fill:** the
-  WS2812 addressable RGB LED strip (a genuinely different protocol
-  from simple digital/PWM — would need its own dedicated role type and
-  firmware library, not just a pin assignment), the 8x8 dot-matrix
-  face display (specialized addressable hardware, not a simple pin
-  role at all), camera video streaming (a real subsystem tied to the
-  ESP32-CAM module specifically, unrelated to the pin-role framework),
-  and the autonomous light-follow/line-track sensor modes (these need
-  actual programmable *behavior* — "if sensor reads X, drive motor Y" —
-  not just declarative I/O mapping, which is a fundamentally different
-  kind of feature than anything this framework does today).
+  8x8 dot-matrix face display — confirmed **WS2812** (Freenove's own
+  sketch comments: *"Use WS2812"*), correcting an earlier guess
+  (VK16K33) logged for this in the LED matrix option-space entry
+  further down — a genuinely different protocol from simple digital/
+  PWM, needing its own dedicated role type and firmware library, not
+  just a pin assignment (see that entry for the full option-space).
+  There may ALSO be a separate WS2812 "Colorful Light" underglow strip
+  distinct from the face matrix (the product listing lists them as
+  separate features) — not independently confirmed which is which.
+  Also out of scope: camera video streaming (a real subsystem tied to
+  the ESP32-CAM/WROVER-CAM module specifically, unrelated to the
+  pin-role framework, already handled separately by the app's existing
+  camera-streaming code), and the autonomous light-follow/line-track
+  sensor modes (these need actual programmable *behavior* — "if sensor
+  reads X, drive motor Y" — not just declarative I/O mapping, a
+  fundamentally different kind of feature than anything this framework
+  does today).
 
   The realistic, honest version of "full circle" is recreating the
   car's **manual driving experience** end to end through generic
   tools — not literally 100% of the original firmware's feature set.
+  **As of this correction, that manual driving experience is blocked
+  on PCA9685 I2C PWM support, which doesn't exist in this firmware at
+  all yet — a real, substantial piece of new work, not a small gap.**
 
 ## Status: done so far
 
@@ -700,14 +741,20 @@ core R/C functionality from scratch.
   real new plumbing, not just another `RoleType` case slotted into
   what already exists.
 
-  **Open question that changes the whole approach: which driver chip
-  is actually on this board.** Original Freenove reference material
-  mentioned "VK16K33" at one point, but that was never independently
-  confirmed against this specific kit — a MAX7219-style 3-wire driver
-  or a WS2812-style single-wire addressable matrix would need a
-  meaningfully different implementation (I2C bus-sharing vs. a
-  dedicated data pin vs. SPI-like signaling). Worth checking the
-  board/datasheet before committing to any option below.
+  **Open question, now resolved with confirmed evidence** (this entry
+  originally flagged this as unverified — since checked directly
+  against Freenove's own source): the driver is **WS2812**, not the
+  VK16K33 originally guessed here. Confirmed from Freenove's own sketch
+  comments (`Freenove_4WD_Car_Kit_for_ESP32` on GitHub): *"Use
+  WS2812."* This changes which option below is realistic — WS2812 is a
+  single-wire addressable protocol (needs a proper driver library like
+  FastLED or Adafruit_NeoPixel, bit-banged or RMT-peripheral timing,
+  not I2C or a simple digitalWrite/ledcWrite), not the I2C-bus-sharing
+  situation this entry originally anticipated. There may ALSO be a
+  separate WS2812 "Colorful Light" underglow strip distinct from the
+  face matrix itself (the product listing shows them as separate
+  features) — not independently confirmed which is which, or whether
+  they're actually the same string of pixels serving double duty.
 
   **Option 1 — minimal, preset patterns only.** A small enum of canned
   faces/animations (closely mirroring the original firmware's "Face
@@ -718,23 +765,31 @@ core R/C functionality from scratch.
   *removing* that category of hardcoding, not reintroducing it.
 
   **Option 2 — a real custom-pattern role type (the one that actually
-  fits this project).** Genuinely generalizable — works for any 8x8
-  matrix using that driver, not just this car specifically. Needs: a
-  new role type that owns an I2C address instead of a GPIO, a firmware
-  command accepting a full bitmap (8 bytes for an 8x8 grid), and — the
-  bigger piece — some kind of pattern editor in the app (an 8x8 toggle
-  grid, saved as a named "scene," sent as a bitmap on trigger).
-  Moderate-to-real effort, but this is the only option that's actually
-  in the spirit of the generalized framework rather than a step back
-  toward hardcoding one car's specific hardware.
+  fits this project).** Genuinely generalizable — works for any WS2812
+  matrix/strip, not just this car specifically. Needs: a new role type
+  that owns a dedicated GPIO (WS2812 needs precise single-wire timing —
+  a proper library like FastLED or Adafruit_NeoPixel, not a shared I2C
+  bus, and NOT compatible with sharing a pin the way I2C peripherals
+  can), a firmware command accepting a full pixel/bitmap pattern, and —
+  the bigger piece — some kind of pattern editor in the app (an 8x8
+  toggle grid or color picker, saved as a named "scene," sent as a
+  pattern on trigger). Moderate-to-real effort, but this is the only
+  option that's actually in the spirit of the generalized framework
+  rather than a step back toward hardcoding one car's specific
+  hardware.
 
-  **Option 3 — a generic I2C peripheral abstraction.** The
+  **Option 3 — a generic addressable-LED peripheral abstraction.** The
   architecturally "correct" answer IF this project ever needs to
-  support other I2C peripherals too (a second matrix, an OLED display,
-  extra sensors) — but building a general "any I2C device" abstraction
-  to serve exactly one chip on one car would be solving a considerably
-  bigger problem than the one actually in front of it. Not worth it
-  unless a second I2C peripheral is already on the horizon.
+  support other WS2812-family hardware too (a second strip, an RGB
+  underglow, other addressable LEDs) — but building a general
+  "any addressable-LED device" abstraction to serve exactly one matrix
+  on one car would be solving a considerably bigger problem than the
+  one actually in front of it. Not worth it unless a second
+  WS2812-family peripheral is already on the horizon. (Separately, if
+  I2C peripheral support ever gets built for the PCA9685 motor/servo
+  gap above, that would be its own distinct abstraction — WS2812 and
+  I2C are different buses with different needs, not one abstraction
+  covering both.)
 
   **Recommendation if this ever gets picked up: Option 2.** Real
   effort, but the only one of the three that doesn't quietly
