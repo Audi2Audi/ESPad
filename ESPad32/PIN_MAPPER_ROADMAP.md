@@ -190,6 +190,58 @@ core R/C functionality from scratch.
       combined pan+tilt from a single 2D stick) — `CUSTOM_PWM` is still
       single-axis-to-single-slider only. A real dual-axis mapping would
       be a separate, more involved feature.
+      **KNOWN ISSUE, needs real-hardware testing to confirm/resolve —
+      not yet tested as of this note, flagged clearly so it isn't lost
+      before that testing happens (could be days out):** `SETV` (our
+      own direct `ledcAttach()`/`ledcWrite()` calls) and `SETA`
+      (ESP32Servo's own internal allocation via its `ESP32PWM` class)
+      both draw from the same 4 physical ESP32 PWM timers, with **no
+      coordination between the two systems** — our code doesn't know
+      what ESP32Servo has claimed, and vice versa.
+      - **Confirmed NOT an issue for basic single-servo use**: ESP32Servo
+        does not require an explicit `ESP32PWM::allocateTimer()` call —
+        confirmed via its own documentation: *"When using ESP32Servo,
+        calling allocateTimer is not necessary. If you don't call the
+        function, all timers will be used."* So `SETA` alone, with no
+        `SETV` roles active on the same device, should work as shipped.
+      - **The real, confirmed risk is specifically when BOTH a PWM_OUTPUT
+        role (`SETV`) and a SERVO role (`SETA`) are in use on the SAME
+        device at the same time.** Evidence: a forum thread where the
+        library's own author responds to exactly this collision — a
+        servo and an unrelated PWM channel ended up sharing one of the
+        4 timers, and changing one's frequency silently changed the
+        other's too (his own words: *"PWM channel 1 shares a timer with
+        0, changing the frequency to 1000.00 Hz will ALSO change channel
+        0 from its previous frequency of 50.00 Hz"*). Applied to us:
+        if `SETV`'s 5000Hz PWM and `SETA`'s 50Hz servo signal end up on
+        the same timer, one could silently override the other's
+        frequency — likely symptom: an LED/motor speed role that
+        suddenly behaves wrong (wrong brightness/speed curve, or stops
+        responding correctly) the moment a servo role is also assigned
+        and used, with no code change to the PWM role itself.
+      - **What to actually test, once hardware access allows:** create
+        BOTH a PWM_OUTPUT role and a SERVO role on the same device,
+        exercise both (e.g. move the servo, then check the PWM role
+        still behaves correctly, and vice versa). If either misbehaves
+        only when the other is also active, that confirms the
+        timer-sharing collision.
+      - **If confirmed, the fix path** (from the library author himself,
+        not guessed): explicitly reserve specific timers for one system
+        or the other via `ESP32PWM::timerCount[N] = 4;` (locks timer N
+        out of ESP32Servo's auto-allocation pool) — or more robustly,
+        stop using raw `ledcAttach()`/`ledcWrite()` for `SETV` entirely
+        and route it through ESP32Servo's own `ESP32PWM` class instead,
+        so both `SETV` and `SETA` go through one coordinated allocator
+        rather than two independent ones fighting over the same
+        physical resource blind to each other.
+      - **Deliberately not guess-patched now** — adding
+        `ESP32PWM::allocateTimer()` calls preemptively without hardware
+        to verify against risks "fixing" a problem that may not exist
+        on this specific core/library version combination while
+        introducing a different one (reserving timers away from `SETV`
+        before confirming it actually needs them). Logged in enough
+        detail here to act on decisively once real hardware testing is
+        possible, rather than needing to be re-derived from scratch.
 
 
 - [x] **Guided Device Setup wizard** — board → functions → pins →
