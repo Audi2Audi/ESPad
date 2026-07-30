@@ -327,7 +327,31 @@ object Boards {
 
     val ALL = listOf(D1_MINI32, ESP32_DEVKIT_V1, ESP32_CAM_AI_THINKER, ESP32_S3_DEVKIT, ESP32_C3_DEVKIT)
 
-    fun byKey(key: String): BoardDef = ALL.find { it.key == key } ?: D1_MINI32
+    // Populated by BoardResolver.allBoards(context) as a side effect —
+    // lets byKey() (which has no Context available, since Boards is a
+    // plain object) resolve custom boards too, as long as
+    // allBoards(context) has run at least once this session (which
+    // every screen's board-tab-building already does). Avoids a much
+    // larger refactor threading Context through every byKey() call
+    // site throughout the app.
+    internal val customBoardsCache = mutableListOf<BoardDef>()
+
+    fun byKey(key: String): BoardDef = (ALL + customBoardsCache).find { it.key == key } ?: D1_MINI32
+}
+
+// Merges built-in boards with user-defined ones (CustomBoardStorage)
+// for anywhere that needs "every board that exists" — New Device's
+// board picker, the Guided Setup wizard, and Pin Mapper's board-switch
+// tabs within an existing profile. Also refreshes Boards.customBoardsCache
+// as a side effect, so plain Boards.byKey() calls elsewhere in the same
+// screen correctly resolve custom boards too.
+object BoardResolver {
+    fun allBoards(context: android.content.Context): List<BoardDef> {
+        val custom = CustomBoardStorage(context).loadBoards().map { it.toBoardDef() }
+        Boards.customBoardsCache.clear()
+        Boards.customBoardsCache.addAll(custom)
+        return Boards.ALL + custom
+    }
 }
 
 // Profiles.TRAIN and Profiles.RC_CAR are now just fallback KEY/BOARD

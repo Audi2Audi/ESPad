@@ -43,6 +43,52 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Custom/unlisted boards — the last remaining formal roadmap
+      item.** Lets someone define a board that isn't in `Boards.ALL`
+      at all: name it, add whichever pins their specific board exposes
+      (label, GPIO number or blank for non-GPIO pads like 3V3/GND,
+      status), mark which are ADC1-capable, flag camera support if it
+      has one. Same spirit as custom profiles/roles — this is app-only
+      logic, doesn't touch firmware at all, since firmware only ever
+      deals in raw `{role, gpio}` pairs regardless of which board
+      those came from.
+      - New `CustomBoardStorage`/`CustomBoard`/`CustomBoardPin` (mirrors
+        `CustomProfileStorage`'s pattern), converting to the same
+        `BoardDef` type built-in boards use via `toBoardDef()` — every
+        existing screen that already consumes a `BoardDef` works
+        unchanged, no special-casing needed downstream.
+      - New `BoardResolver.allBoards(context)` merges built-in + custom
+        for anywhere that needs the full list (New Device's board
+        picker, the Guided Setup wizard's board step, Pin Mapper's
+        board-switch tabs within an existing profile) — same pattern
+        as `ProfileResolver`.
+      - **Real architectural wrinkle, solved pragmatically rather than
+        with a large refactor:** `Boards.byKey()` is called throughout
+        the app with no `Context` available (it's a plain compiled
+        object), so it can't read `SharedPreferences` for custom boards
+        directly. Rather than thread `Context` through every one of
+        those call sites, `Boards` gained a `customBoardsCache` that
+        `BoardResolver.allBoards(context)` populates as a side effect —
+        as long as a screen calls `allBoards()` at least once (which
+        board-tab-building already does everywhere), plain
+        `Boards.byKey()` calls elsewhere in that same screen correctly
+        resolve custom boards too, without a sprawling signature change
+        across the codebase.
+      - `showDefineCustomBoardDialog()` is a standalone function (not
+        tied to one Activity), so Pin Mapper's picker and the wizard's
+        board step share the exact same creation flow instead of two
+        copies — deliberately avoiding the same "two independent copies
+        of one feature" trap found and fixed twice earlier this session
+        (OTA, then Presets).
+      **Known cosmetic quirk, not a bug:** custom boards render as a
+      single pin column (`rightHeader` is always empty for a converted
+      custom board) — the board diagram's two-column layout just shows
+      an empty second column rather than breaking, since
+      `buildHeaderColumn()` already handles an empty list gracefully.
+      Not worth restructuring the rendering for a single-column-vs-two
+      distinction given how rarely this will matter in practice.
+
+
 - [x] **Option A built: device-hosted web UI, full version (create,
       not just adjust) with two-way sync.** The bigger, more honest
       scope was chosen deliberately over a narrower "web UI can only
@@ -874,10 +920,7 @@ entry above.
       forced back to Train on open, regardless of `ActiveProfile`), and
       handle "the active profile got deleted" / "zero profiles exist"
       gracefully by falling back to whatever's actually still there.
-- [ ] Custom/unlisted boards: let someone define a board that isn't in
-      `Boards.ALL` — name it, mark which physical pins exist, flag
-      restrictions manually. Bigger lift (needs its own validation UI
-      and persisted custom-board definitions)
+- [x] Custom/unlisted boards — done, see the entry above.
 
 ## Live device transport — confirmed architecture
 

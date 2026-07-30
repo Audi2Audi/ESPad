@@ -94,7 +94,7 @@ class DeviceWizardActivity : AppCompatActivity() {
         })
 
         val boardRow = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        Boards.ALL.forEach { board ->
+        BoardResolver.allBoards(this).forEach { board ->
             val btn = Button(this).apply {
                 text = board.displayName
                 textSize = 12f
@@ -108,6 +108,19 @@ class DeviceWizardActivity : AppCompatActivity() {
             }
             boardRow.addView(btn)
         }
+        val customBoardBtn = Button(this).apply {
+            text = "+ Define Custom Board"
+            textSize = 12f
+            isAllCaps = false
+            setTextColor(Color.parseColor("#E3A458"))
+            setOnClickListener {
+                showDefineCustomBoardDialog(this@DeviceWizardActivity) { newBoard ->
+                    selectedBoardKey = newBoard.key
+                    renderStep() // refresh — will now show the new board too, via BoardResolver
+                }
+            }
+        }
+        boardRow.addView(customBoardBtn)
         contentArea.addView(boardRow)
 
         val nextBtn = Button(this).apply {

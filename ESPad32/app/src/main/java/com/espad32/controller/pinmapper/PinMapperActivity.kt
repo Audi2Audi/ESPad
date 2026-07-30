@@ -157,7 +157,7 @@ class PinMapperActivity : AppCompatActivity() {
         })
         var selectedBoardKey = Boards.ALL.first().key
         val boardRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        Boards.ALL.forEach { board ->
+        fun addBoardButton(board: BoardDef, autoSelect: Boolean = false) {
             val boardBtn = Button(this).apply {
                 text = board.displayName
                 textSize = 11f
@@ -165,7 +165,21 @@ class PinMapperActivity : AppCompatActivity() {
                 setOnClickListener { selectedBoardKey = board.key }
             }
             boardRow.addView(boardBtn)
+            if (autoSelect) selectedBoardKey = board.key
         }
+        BoardResolver.allBoards(this).forEach { board -> addBoardButton(board) }
+        val customBoardBtn = Button(this).apply {
+            text = "+ Custom"
+            textSize = 11f
+            isAllCaps = false
+            setOnClickListener {
+                showDefineCustomBoardDialog(this@PinMapperActivity) { newBoard ->
+                    addBoardButton(newBoard, autoSelect = true)
+                    log("Created custom board \"${newBoard.displayName}\".")
+                }
+            }
+        }
+        boardRow.addView(customBoardBtn)
         container.addView(boardRow)
 
         // Alternative to filling in the form above: paste a profile
@@ -354,7 +368,7 @@ class PinMapperActivity : AppCompatActivity() {
 
     private fun buildBoardTabs() {
         boardTabContainer.removeAllViews()
-        Boards.ALL.forEach { board ->
+        BoardResolver.allBoards(this).forEach { board ->
             val tab = Button(this).apply {
                 text = board.displayName
                 textSize = 11f
