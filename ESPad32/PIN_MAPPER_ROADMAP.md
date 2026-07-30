@@ -830,6 +830,71 @@ originally written, now corrected above for motors/servos):**
   effort, but the only one of the three that doesn't quietly
   contradict everything else built this session.
 
+- **A general "pick a driver, assign its pins" system covering common
+  peripherals — cameras, SD card readers, motor driver ICs, audio
+  DACs, etc.** Raised as a direct question, worth recording the
+  feasibility breakdown rather than re-deriving it later — the answer
+  varies enormously by peripheral, not one number.
+
+  **The real architectural shift this implies, before any specific
+  peripheral:** everything so far assumes one role = one GPIO pin = one
+  scalar command. A driver-based model means a role instead references
+  a *driver instance* (e.g. "the PCA9685 at I2C address 0x40") plus a
+  channel/index within it — and that driver instance owns a set of
+  pins that might be *shared* across many roles (I2C's 2 pins can
+  serve 16 PCA9685 channels, or a completely separate I2C sensor at a
+  different address) rather than *exclusive* per role (a directly-
+  wired servo still needs its own dedicated pin). This is legitimate —
+  it's essentially what ESPHome does (a `pca9685` "hub" component,
+  then individual outputs that reference it + a channel), so there's
+  real precedent this pattern works — but it's a genuinely bigger
+  shift than anything built so far, not an incremental addition to the
+  existing `RoleType` system.
+
+  **Per-peripheral feasibility — this is the part that isn't one
+  number:**
+  - **Motor driver ICs (PCA9685-style) — the most tractable, and the
+    most valuable given the Freenove-car finding above.** Fits the
+    existing mental model reasonably well once "I2C bus + channel"
+    exists as a pin-reference type alongside plain GPIO. Real work,
+    but bounded. **The recommended first candidate if this direction
+    gets picked up** — directly unblocks the thing actually blocking
+    the Freenove car's motors/servos right now, not a speculative
+    nice-to-have.
+  - **Addressable LEDs (WS2812)** — moderate. One exclusive pin per
+    strip (no bus-sharing complexity, unlike PCA9685), but needs a
+    real pattern-data command and an app-side pattern editor. Already
+    scoped as its own option-space in the LED matrix entry above.
+  - **Audio (I2S/MAX98357A)** — hard, for a reason beyond just "new
+    protocol": playing a sound requires the sound to *live* somewhere
+    first. That's either baked into firmware flash (inflexible,
+    limited) or read from an SD card — meaning this one is actually
+    gated behind the SD card driver existing first, not independent of
+    it. See the Train hardware verification entry above.
+  - **SD card readers** — hard, but for a completely different reason
+    than the others: it's not "drive a peripheral," it's "build a
+    file-transfer subsystem" (list/read/write/delete over the
+    network) — genuinely comparable in scope to the OTA feature or the
+    web UI itself, not just another driver type slotted into the
+    existing role system.
+  - **Cameras — deliberately NOT grouped with the others.** It's a
+    continuous video stream, not a discrete controllable peripheral
+    with commands, and the app already has bespoke handling for it
+    entirely separate from Pin Mapper/roles. Folding it into "just
+    another driver" would likely be a worse fit than leaving it where
+    it already is.
+
+  **Honest bottom line:** a fully generic "pick any driver, assign its
+  pins" system is closer to a small platform redesign than a feature —
+  each of PCA9685/WS2812/audio/SD-card is individually about the size
+  of something already built this session (servo support, the web UI,
+  OTA), and building one abstraction to cleanly cover all of them at
+  once is a bigger undertaking than any single one of those was. **Not
+  recommended to build the whole generic system in one shot.** PCA9685
+  specifically is the one piece worth treating as a real near-term
+  candidate; the rest are worth having thought through, not worth
+  committing to yet.
+
 
 
 - **Two different hosting models for the "PC-based profile creator"
