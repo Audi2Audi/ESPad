@@ -43,6 +43,71 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **Board-aware validation, file-based export/import, and OTA —
+      all added to the device web UI (v14, firmware, delivered as a
+      zip).** Prompted by a direct question worth recording the
+      reasoning for: "should board selection and pin planning live in
+      the web UI, including planning for a board other than the one
+      connected?" **Deliberately drew a line here rather than build
+      past it** — board-*awareness* for the device actually being
+      looked at is legitimate and was built; planning a profile for a
+      DIFFERENT board than what's connected was declined, because the
+      web UI is physically embedded on one live device with no
+      offline/draft mode — every write validates against and saves to
+      that real device's real NVS immediately. That's exactly the
+      distinction the roadmap already draws between Option A (this,
+      device-hosted) and Option B (a separately-hosted planning tool,
+      not yet started) — Option B exists specifically to NOT be tied
+      to a live device, which is what "plan for hardware I don't own"
+      actually needs. Retrofitting that onto Option A would mean
+      re-deriving Option B's reason for existing, awkwardly, inside
+      something that's fundamentally live-device-only.
+      - **Board-aware validation**: new `board_defs.h` — pin
+        availability tables for the built-in boards (mirroring a
+        SUBSET of the app's own `BoardDef` knowledge, necessarily
+        duplicated since firmware can't call into the phone's Kotlin).
+        This device can't auto-detect its own board, so it's a
+        one-time setting, same mental model as the app's own board
+        picker. Defaults to "generic" (chip-level rules only, no
+        board-specific narrowing) until set, so validation doesn't get
+        silently MORE restrictive for anyone who hasn't set this yet.
+        New `GET /api/boards`, `GET`/`POST /api/board`, and
+        `GET /api/board/pins?type=X` (the last populates the Add
+        Function form's GPIO field as a dropdown of only the pins
+        valid for the current board + type, replacing a raw number
+        input — mirrors the app's own Pin Mapper dropdown filtering).
+        Both `POST /api/config` and `POST /api/import` now check
+        `board_allowsGpio()` in addition to the existing chip-level
+        `validateGpio()`.
+      - **File-based export/import**: export now triggers an actual
+        browser file download (`Blob` + a temporary anchor's `download`
+        attribute) instead of a copyable textarea; import reads a
+        chosen file via `FileReader` instead of pasted text. Same
+        backend endpoints as before — this only changed how the
+        request body gets populated on the frontend.
+      - **OTA via the web UI**: `POST /api/ota`, deliberately built as
+        its own thing rather than reusing `ota.h`'s existing handler —
+        that one decodes HTTP chunked transfer encoding (what the
+        app's Android OTA client sends); a browser's
+        `fetch(url, {body: file})` sends a plain `Content-Length` body
+        instead, so this streams directly into `Update.write()` in 4KB
+        chunks against that instead. Detected and handled EARLY in
+        `webui_poll()`, before the generic small-buffer body reading
+        used by every JSON endpoint — a firmware `.bin` can be
+        megabytes; that buffer is 512 bytes.
+      - **Security note reiterated, not newly introduced**: this has
+        no authentication, same gap already logged for the app-facing
+        OTA port. Flagged again here because a second, browser-
+        reachable OTA path makes that existing gap more concretely
+        exploitable, not because this endpoint adds a new category of
+        risk beyond what already existed.
+      - **Same verification discipline applied again** as the earlier
+        WiFi-handlers mistake (checking brace balance against the last
+        known-good file before packaging, not just eyeballing the
+        diff) — came back clean this time, no fix needed, but worth
+        keeping the habit given how large this particular edit was.
+
+
 - [x] **WiFi setup and Export/Import added to the device web UI**
       (v12, v13 — firmware, delivered as zips rather than tracked in
       this repo).
