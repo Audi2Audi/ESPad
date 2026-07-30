@@ -92,7 +92,15 @@ object ProfileExportImport {
 
         val profileObj = root.getJSONObject("profile")
         val displayName = profileObj.optString("displayName", "Imported Device")
-        val boardKey = profileObj.optString("boardKey", Boards.D1_MINI32.key)
+        // .ifBlank, not just optString's own missing-key default — a
+        // device-exported profile (from the web UI) sends boardKey as
+        // a present-but-empty string, since the device has no board
+        // concept at all. optString's default only covers the key
+        // being absent entirely, not present-but-blank, so without
+        // this the board would silently resolve to "" — Boards.byKey()
+        // falls back safely when actually looked up, but the imported
+        // profile's board tab would never show as selected anywhere.
+        val boardKey = profileObj.optString("boardKey", Boards.D1_MINI32.key).ifBlank { Boards.D1_MINI32.key }
 
         val profileStorage = CustomProfileStorage(context)
         val roleStorage = CustomRoleStorage(context)

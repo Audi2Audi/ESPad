@@ -43,6 +43,51 @@ core R/C functionality from scratch.
 
 ## Status: done so far
 
+- [x] **WiFi setup and Export/Import added to the device web UI**
+      (v12, v13 — firmware, delivered as zips rather than tracked in
+      this repo).
+      - **WiFi (v12)**: a section on the device page showing current
+        connection status, SSID/password fields, Connect/Forget
+        buttons. Routes to the exact same `wifi_sta.h` functions the
+        app's `CMD_WIFI_STA#` already uses — not a second WiFi
+        implementation, a second front door to the same one. Same
+        ~10s blocking connect behavior as the app already has.
+      - **Export/Import (v13)**: `GET /api/export` produces the SAME
+        JSON schema the phone app's own `ProfileExportImport.kt`
+        already uses — a profile can genuinely move in either
+        direction: export from the device, paste into the app's
+        "+ New Device" import field, or export from the app and paste
+        into the device page. Omits "buttons" — Controls buttons are a
+        phone-only concept (which on-screen widget represents a role);
+        the device has no notion of that, only role/label/type/gpio.
+        `POST /api/import` accepts either the full phone-export shape
+        or a bare roles array, all-or-nothing (one invalid entry
+        aborts the whole import, nothing already-saved gets touched) —
+        same atomic behavior every other config-writing path already
+        follows. Full replace, not a merge, matching the same one-way
+        model as Sync from Device.
+      - **A real editing mistake was caught and fixed before shipping
+        v13, worth being honest about**: while inserting the WiFi
+        handler functions into `webui.h`, a `str_replace` accidentally
+        deleted `webui_handlePage`'s own function signature while
+        keeping its body — would have been a hard compile failure
+        (code outside any function). Caught by actually verifying
+        brace balance against the last known-good file rather than
+        eyeballing the diff, not by luck.
+      - **App-side interoperability fix**, found while verifying the
+        export/import round-trip actually works end to end (not
+        assumed): the phone's `ProfileExportImport.importFromJson()`
+        only fell back to a default board when `boardKey` was
+        *missing* from the JSON. A device export sends it *present but
+        empty* (the device has no board concept at all to report), which
+        `optString`'s own default doesn't catch. Would have still
+        technically worked (`Boards.byKey()` already falls back safely
+        wherever it's looked up), but the imported profile's board tab
+        would never show as selected anywhere. Fixed with `.ifBlank {}`
+        rather than leaving a known rough edge in a feature just
+        described as fully interoperable.
+
+
 - [x] **Custom/unlisted boards — the last remaining formal roadmap
       item.** Lets someone define a board that isn't in `Boards.ALL`
       at all: name it, add whichever pins their specific board exposes
