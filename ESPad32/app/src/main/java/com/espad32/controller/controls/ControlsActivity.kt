@@ -90,10 +90,11 @@ class ControlsActivity : AppCompatActivity() {
     }
 
     /** Roles eligible to back a control — digital outputs (toggle/momentary),
-     *  PWM outputs (slider), and servo (slider, 0-180 degrees), built-in
+     *  PWM outputs (slider), servo (slider, 0-180 degrees), and audio signal
+     *  (a fire-and-forget trigger, same as a momentary button), built-in
      *  AND custom. */
     private fun eligibleRoles() = RoleResolver.effectiveRoles(currentProfile, customRoleStorage)
-        .filter { it.type == RoleType.DIGITAL_OUTPUT || it.type == RoleType.PWM_OUTPUT || it.type == RoleType.SERVO }
+        .filter { it.type == RoleType.DIGITAL_OUTPUT || it.type == RoleType.PWM_OUTPUT || it.type == RoleType.SERVO || it.type == RoleType.AUDIO_SIGNAL }
 
     private fun renderButtons() {
         buttonListContainer.removeAllViews()
@@ -375,6 +376,14 @@ class ControlsActivity : AppCompatActivity() {
                 selectedType = ControlType.SLIDER
                 behaviorContainer.addView(TextView(this).apply {
                     text = "Slider (0-180°) — the only option for a servo function"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#5F6A73"))
+                })
+            } else if (selectedRole.type == RoleType.AUDIO_SIGNAL) {
+                selectedType = ControlType.MOMENTARY
+                behaviorContainer.addView(TextView(this).apply {
+                    text = "Tap to play — the only option for an audio signal function " +
+                        "(fire-and-forget, a persistent on/off Toggle wouldn't make sense here)"
                     textSize = 11f
                     setTextColor(Color.parseColor("#5F6A73"))
                 })

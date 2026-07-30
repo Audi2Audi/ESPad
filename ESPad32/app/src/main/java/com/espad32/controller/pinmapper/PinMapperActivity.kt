@@ -794,27 +794,45 @@ class PinMapperActivity : AppCompatActivity() {
             isAllCaps = false
             setOnClickListener { selectedType = RoleType.SERVO; highlightSelected() }
         }
+        val audioBtn = Button(this).apply {
+            text = "Audio Signal"
+            textSize = 11f
+            isAllCaps = false
+            setOnClickListener { selectedType = RoleType.AUDIO_SIGNAL; highlightSelected() }
+        }
         typeButtons[RoleType.DIGITAL_OUTPUT] = digitalBtn
         typeButtons[RoleType.PWM_OUTPUT] = pwmBtn
         typeButtons[RoleType.ANALOG_INPUT] = analogBtn
         typeButtons[RoleType.SERVO] = servoBtn
+        typeButtons[RoleType.AUDIO_SIGNAL] = audioBtn
         typeRow.addView(digitalBtn)
         typeRow.addView(pwmBtn)
         typeRow.addView(analogBtn)
         typeRow.addView(servoBtn)
+        typeRow.addView(audioBtn)
         container.addView(typeRow)
         highlightSelected()
 
         // Servo now genuinely supported — real angle control (SETA,
         // 0-180 degrees) via the ESP32Servo library, not just PWM duty
         // reinterpreted as an angle. See PIN_MAPPER_ROADMAP.md.
+        //
+        // Audio Signal — first real test of a driver-based role type,
+        // not simple GPIO at all (see audio_signal.h on the firmware
+        // side). No pin to pick for this one; it plays ONE fixed
+        // embedded test tone (not a real train whistle recording yet)
+        // over I2S. Auto-assigned to a placeholder pin value below,
+        // since there's currently only one clip and asking the user to
+        // "pick a GPIO" for it would be confusing and meaningless.
         val currentAdc1Pins = Boards.byKey(currentBoardKey).adc1Pins.sorted().joinToString("/")
         val noteText = TextView(this).apply {
             text = "On/Off backs a toggle button in Controls. PWM backs a slider " +
                 "(0-255). Servo backs a slider too, but 0-180 degrees, sent as a " +
                 "real angle command. Analog In reads a live voltage — e.g. battery " +
                 "level via your own voltage divider — and can only go on an ADC1 " +
-                "pin ($currentAdc1Pins on this board, marked available in the diagram above)."
+                "pin ($currentAdc1Pins on this board, marked available in the diagram above). " +
+                "Audio Signal plays a fixed embedded test tone over I2S (BCLK/LRCLK/DIN " +
+                "are firmware-fixed, not assignable here) — no real pin to pick, so none is shown."
             textSize = 11f
             setTextColor(Color.parseColor("#5F6A73"))
             setPadding(0, 20, 0, 0)
@@ -833,6 +851,15 @@ class PinMapperActivity : AppCompatActivity() {
                 customRoles.add(CustomRole(key, label, group, selectedType))
                 customRoleStorage.saveCustomRoles(currentProfile.key, customRoles)
                 log("Added function \"$label\".")
+
+                if (selectedType == RoleType.AUDIO_SIGNAL) {
+                    // No real pin to pick — auto-assign the placeholder
+                    // value immediately (see the note above and
+                    // audio_signal.h: this is really a clip index, not
+                    // a GPIO, and there's only clip 0 right now).
+                    assignGpioToRole(key, 0)
+                }
+
                 renderRoles()
             }
             .setNegativeButton("Cancel", null)

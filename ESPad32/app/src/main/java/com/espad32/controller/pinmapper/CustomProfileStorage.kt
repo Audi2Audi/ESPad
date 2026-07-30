@@ -159,9 +159,19 @@ class CustomProfileStorage(context: Context) {
                 CustomRole("motor_dir_b", "Motor direction B", "Motor", RoleType.DIGITAL_OUTPUT),
                 CustomRole("motor_pwm", "Motor speed (PWM)", "Motor", RoleType.PWM_OUTPUT),
                 CustomRole("motor_standby", "Motor standby", "Motor", RoleType.DIGITAL_OUTPUT),
-                CustomRole("audio_bclk", "Audio bit clock", "Audio", RoleType.AUDIO_SIGNAL),
-                CustomRole("audio_lrc", "Audio L/R clock", "Audio", RoleType.AUDIO_SIGNAL),
-                CustomRole("audio_din", "Audio data in", "Audio", RoleType.AUDIO_SIGNAL)
+                // Was 3 separate audio_bclk/audio_lrc/audio_din roles,
+                // seeded early in the session before real AUDIO_SIGNAL
+                // support existed — that assumed each I2S pin would be
+                // its own user-assignable role. The actual
+                // implementation (see audio_signal.h) fixes all 3 I2S
+                // pins as firmware constants instead (not user-
+                // assignable at all) and uses ONE role per sound clip,
+                // reinterpreting its stored "pin" as a clip index.
+                // Replaced to match reality — a device that already
+                // ran the old seed will still have the 3 stale roles
+                // sitting in local storage until manually deleted,
+                // this only fixes it for anyone seeding fresh.
+                CustomRole("whistle", "Whistle", "Audio", RoleType.AUDIO_SIGNAL)
             )
         )
         seedRolesAdditively(
