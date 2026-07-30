@@ -1036,7 +1036,51 @@ kept here only so the historical framing isn't lost:
       beyond the original single-command scope (SETV, GET, CMD_WIFI_*,
       CMD_VERSION, OTA on a separate port).
 
-## Known issue to investigate
+## Security — not addressed yet, will need to be eventually
+
+Right now **nothing on this device requires authentication at all** —
+the web UI is the most obvious exposure (anyone who can reach it in a
+browser can freely add/edit/delete pin functions, no login, no
+confirmation), but it's really the whole picture that's open:
+
+- **The AP password is a hardcoded, printed-in-the-source-comments
+  default** (`espad1234`) — same for every device running this
+  firmware, visible to anyone who reads the (public) repo. Anyone who
+  knows it, or just tries it, can join the AP.
+- **The web UI (port 8081) has zero authentication** — no password, no
+  confirmation before a destructive action (delete a function). Once
+  someone's on the network, they can freely reconfigure the device
+  from any browser.
+- **The TCP command port (4000) and OTA port (8080) are equally
+  open** — no auth on `SET`/`SETV`/`SETA`/`GET`/`GET_CONFIG`, and
+  critically, **no auth on OTA firmware flashing** — anyone on the
+  network could push arbitrary firmware to the device. This is
+  arguably the more serious exposure of the two, even though the web
+  UI is the more *obvious/inviting* one (a browser is a much lower
+  barrier than crafting raw TCP commands or an OTA HTTP upload).
+- **If the device is on a shared/home network (STA mode)**, this
+  exposure isn't limited to whoever's near the device's own AP —
+  anyone else on that same home network can reach all of the above
+  too, unless the router itself has client isolation enabled.
+
+**Reasonable direction for eventually addressing this** — roughly in
+order of effort vs. value, not a commitment to build all of it:
+1. A user-settable AP password (already possible technically — the
+   password is just a hardcoded string — but worth exposing as an
+   actual setting rather than leaving the well-known default in place).
+2. Simple shared-secret protection on the web UI and OTA endpoints
+   (HTTP Basic Auth, or a plain password field checked against a
+   stored value) — lightweight, doesn't need real infrastructure,
+   similar effort to the hand-rolled HTTP handling already built for
+   OTA/the web UI. This is the "good enough to deter casual/opportunistic
+   access" bar, not a full security posture — proportionate to what
+   this actually is (a hobbyist device on a local network), not
+   something that needs session tokens/CSRF protection/etc.
+3. A confirmation step before destructive web UI actions (deleting a
+   function) — small, cheap, worth doing regardless of the auth
+   question above.
+
+
 
 - **Suspected ESP32 crash/reboot during gamepad axis PWM testing** — app
   showed "Reconnecting..." after driving the axis-mapped PWM slider for
