@@ -84,6 +84,41 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Checked the Train's own hardware (TB6612FNG motor driver +
+      MAX98357A audio DAC) for the same category of issue just found
+      with the Freenove car's PCA9685/WS2812 — verified independently
+      rather than assumed, since this project's whole habit this
+      session has been checking hardware claims rather than trusting
+      memory.** Split result, not a flat yes/no:
+      - **TB6612FNG motor driver — confirmed NO issue, genuinely
+        compatible with this framework as it exists today.** Multiple
+        independent sources confirm it's controlled entirely through
+        plain GPIO — `AIN1`/`AIN2` (direction, digital), `PWMA` (speed,
+        PWM), `STBY` (standby enable, digital). No I2C, no shared bus,
+        nothing hidden behind an unreachable peripheral. Matches
+        `SET`+`SETV` exactly. Not just theoretical either — this is
+        the same combo already tested on real hardware earlier this
+        session (D1 Mini32 + TB6612FNG driving an actual test LED/
+        motor over the live TCP connection).
+      - **MAX98357A audio DAC — a real parallel to the PCA9685/WS2812
+        gap, just a different protocol.** It's I2S, not I2C — three
+        dedicated lines (`BCLK`/`LRCLK`/`DIN`) streaming actual PCM
+        audio sample data continuously via the ESP32's dedicated I2S
+        peripheral hardware. There's no way to represent "play this
+        sound" as a `SET`/`SETV`/`SETA` command — those only ever
+        carry a single scalar value (on/off, a PWM number, a servo
+        angle), never a continuous audio stream. If the Train's
+        whistle/sound effects were meant to go through this framework,
+        that's currently just as unreachable as the Freenove car's
+        motors were, for the same underlying reason: a real streaming
+        subsystem this firmware has never had any support for. Not
+        assigned an option-space writeup yet (unlike the LED matrix
+        question) — logged here as confirmed-but-unaddressed, worth
+        its own proper option-space discussion if/when audio playback
+        becomes a real want rather than a hypothetical.
+
+
+
 - [x] **Board-aware validation, file-based export/import, and OTA —
       all added to the device web UI (v14, firmware, delivered as a
       zip).** Prompted by a direct question worth recording the
