@@ -265,24 +265,51 @@ core R/C functionality from scratch.
         in `MainActivity.showSettings()`).
       - Renders all 12 physical buttons `ControllerMapping.ALL_BUTTONS`
         already knows about (A/B/X/Y, L1/R1/L2/R2, stick clicks, Start/
-        Select). **Visually redesigned since the first version** —
-        replaced a flat 4-per-row rectangular grid (feedback: looked
-        cramped/ugly) with circular buttons in a proper diamond
-        arrangement for the face buttons (Y top, X/B middle, A bottom),
-        stacked shoulder columns (L1/L2 left, R1/R2 right), and a
-        smaller utility row (Select/L3/R3/Start) underneath — modeled
-        on a reference screenshot of a similar circular-button remote
-        layout. New `virtual_button_circle.xml` drawable (thin cyan
-        outline, translucent dark fill) for the circles themselves.
-      - **Labels show what's actually mapped**, not just raw button
-        names — a `CUSTOM_CONTROL` button resolves to the real Controls
-        button's label (e.g. shows "LED" under "A"), so someone using
-        this without ever touching a physical gamepad can tell what
-        each button does, not just see cryptic "A"/"B"/"X" labels.
-      - Real press/release via `OnTouchListener` (not tap), matching the
-        momentary-button fix from the same session — consistent
-        behavior whether it's a MOMENTARY-mapped custom function or the
-        legacy horn.
+        Select). **Redesigned twice** — first pass replaced a flat
+        4-per-row rectangular grid with circles in a diamond, but used
+        plain `LinearLayout` columns for the shoulder buttons; per
+        follow-up feedback comparing directly against a reference
+        screenshot, that first pass had the shoulder buttons too far
+        from the diamond (large gaps instead of tight bracketing) and
+        `LinearLayout`'s gravity-based centering didn't reliably land
+        them at the intended height. **Second pass rebuilt the cluster
+        with a `FrameLayout` and explicit pixel-margin math** instead
+        of relying on layout flow — Y/X/B/A placed at exact
+        center-to-center diamond coordinates, L1/L2/R1/R2 placed with a
+        small fixed offset bracketing the X/B row height, matching the
+        reference precisely rather than approximately. New
+        `virtual_button_circle.xml` drawable (thin cyan outline,
+        translucent dark fill) for the circles.
+      - **Trade-off made deliberately**: the first version showed what
+        each button is actually mapped to as a caption under the
+        circle (e.g. "LED" under "A"). The tight center-to-center
+        spacing needed to match the reference leaves no room for a
+        caption line between rows without overlapping the row below,
+        so captions were dropped from the diamond/shoulder buttons in
+        the second pass. `resolveVirtualButtonTarget()` is kept
+        (unused for now) rather than deleted, since it's the exact
+        logic needed if captions come back in some other form later
+        (e.g. a toast on long-press).
+      - Select/L3/R3/Start moved out of the main diamond cluster
+        entirely (the reference doesn't show equivalents nested with
+        its D-pad/diamond either — those are separate small toolbar
+        icons elsewhere on its screen) — now a smaller row directly
+        below instead.
+      - **Open question, not resolved by this pass:** an earlier
+        screenshot showed the cluster overlapping the app's centered
+        "no camera feed" placeholder logo. The tighter shoulder
+        positioning reduces cluster *width*, but total cluster
+        *height* (top of Y to bottom of the utility row) isn't
+        dramatically smaller than the first version — the utility row
+        still adds roughly the same vertical space, just structured as
+        a sibling instead of nested inside the diamond column. Worth
+        confirming after rebuilding whether the overlap is actually
+        gone or still needs a separate fix (e.g. moving the utility row
+        further away, or repositioning the whole cluster lower).
+      - Real press/release via `OnTouchListener` (not tap) still holds
+        in both redesigns, matching the momentary-button fix from the
+        same session — consistent behavior whether it's a MOMENTARY-
+        mapped custom function or the legacy horn.
       **No D-pad** — `ALL_BUTTONS` doesn't include discrete D-pad
       entries (handled as axes/hat input on real controllers, not
       separate `KeyEvent`s in this system), so the virtual overlay
