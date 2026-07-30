@@ -682,7 +682,65 @@ core R/C functionality from scratch.
       no clean "this profile's gamepad mappings" to export today. A
       real limitation, not an oversight.
 
-## Future idea, partially built
+## Future idea, not started
+
+- **Incorporating the Freenove car's LED matrix face display.**
+  Logged as an option-space, not a commitment to build — raised as a
+  direct question, worth recording the reasoning rather than
+  re-deriving it next time it comes up.
+
+  **The core tension, before any specific approach:** everything in
+  this framework so far assumes "one role = one GPIO pin + one scalar
+  value" (on/off, a PWM number, a servo angle, a voltage reading). An
+  LED matrix breaks both halves of that assumption — most of these
+  driver chips sit on a shared bus (I2C, or a 3-wire serial protocol)
+  rather than owning a single GPIO, and what you'd actually send it
+  isn't a scalar, it's a whole 8x8 (or larger) pattern. There's no
+  genuinely "quick" version of this — every option below involves some
+  real new plumbing, not just another `RoleType` case slotted into
+  what already exists.
+
+  **Open question that changes the whole approach: which driver chip
+  is actually on this board.** Original Freenove reference material
+  mentioned "VK16K33" at one point, but that was never independently
+  confirmed against this specific kit — a MAX7219-style 3-wire driver
+  or a WS2812-style single-wire addressable matrix would need a
+  meaningfully different implementation (I2C bus-sharing vs. a
+  dedicated data pin vs. SPI-like signaling). Worth checking the
+  board/datasheet before committing to any option below.
+
+  **Option 1 — minimal, preset patterns only.** A small enum of canned
+  faces/animations (closely mirroring the original firmware's "Face
+  Cycle"), one new lightweight role type, one command like
+  `SETFACE <role> <index>`. Least work by far, but it's really just
+  re-adding a Freenove-specific feature under a thin generic wrapper —
+  cuts directly against the session's actual direction, which has been
+  *removing* that category of hardcoding, not reintroducing it.
+
+  **Option 2 — a real custom-pattern role type (the one that actually
+  fits this project).** Genuinely generalizable — works for any 8x8
+  matrix using that driver, not just this car specifically. Needs: a
+  new role type that owns an I2C address instead of a GPIO, a firmware
+  command accepting a full bitmap (8 bytes for an 8x8 grid), and — the
+  bigger piece — some kind of pattern editor in the app (an 8x8 toggle
+  grid, saved as a named "scene," sent as a bitmap on trigger).
+  Moderate-to-real effort, but this is the only option that's actually
+  in the spirit of the generalized framework rather than a step back
+  toward hardcoding one car's specific hardware.
+
+  **Option 3 — a generic I2C peripheral abstraction.** The
+  architecturally "correct" answer IF this project ever needs to
+  support other I2C peripherals too (a second matrix, an OLED display,
+  extra sensors) — but building a general "any I2C device" abstraction
+  to serve exactly one chip on one car would be solving a considerably
+  bigger problem than the one actually in front of it. Not worth it
+  unless a second I2C peripheral is already on the horizon.
+
+  **Recommendation if this ever gets picked up: Option 2.** Real
+  effort, but the only one of the three that doesn't quietly
+  contradict everything else built this session.
+
+
 
 - **Two different hosting models for the "PC-based profile creator"
   idea — worth comparing rather than assuming one is obviously right:**
