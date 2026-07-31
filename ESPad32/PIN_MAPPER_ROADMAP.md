@@ -84,6 +84,55 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Live Controls in the web UI — actually control the device from
+      a browser, no phone needed** (v16 firmware, delivered as a zip).
+      Requested as "a copy of the on-screen gamepad controls in the
+      web UI" — **worth recording why it isn't literally that**, since
+      the reasoning matters for anything similar later: the app's
+      virtual gamepad relies on `ControllerMapping` (which A/B/X/Y maps
+      to which function) — that mapping lives ENTIRELY on the phone,
+      the device has never known about it at all. A literal "12 fixed
+      gamepad slots" would have nothing to map to on the device side.
+      **The better-fitted equivalent, built instead**: one real control
+      per function actually configured on the device, styled with the
+      same circular look — since the device already knows its own role
+      list (`GET_CONFIG`/`/api/config`), this needs no new mapping
+      concept at all, unlike trying to replicate the phone's
+      abstraction.
+      - **Real gap this exposed and had to fix first**: the web UI
+        could only read/write *configuration* — it had no way to fire
+        a live command (`SET`/`SETV`/`SETA`/`GET`) at all. New
+        `POST /api/trigger` (`{role, action, value}`), reusing the
+        EXACT SAME `handleSetCommand()`/`handleSetValueCommand()`/
+        `handleGetCommand()`/`handleSetAngleCommand()` the TCP command
+        channel already calls — not a second, parallel implementation.
+        Required a new `StringPrint` class (a `Stream` subclass that
+        captures `print()`/`println()` output into a `String` instead
+        of sending it over a real connection) so those existing
+        Stream-based handlers could be called and their response
+        captured for wrapping in an HTTP JSON reply — and forward
+        declarations for those three handler functions at the top of
+        `webui.h`, since they're textually defined later in the main
+        `.ino`, after `webui.h` gets `#include`d.
+      - **Frontend**: a "Live Controls" section rendering one control
+        per role from the same `/api/config` data `load()` already
+        fetches for the function list (reused, not a duplicate fetch)
+        — `DIGITAL_OUTPUT`/`AUDIO_SIGNAL` as circular buttons (Toggle
+        vs. tap-to-play, matching the same distinction already made in
+        the app's Controls screen), `PWM_OUTPUT`/`SERVO` as sliders
+        (0-255 / 0-180, sent on release not on every drag tick, same
+        reasoning as the app's own sliders), `ANALOG_INPUT` as a
+        refresh button showing the live reading. New CSS matching the
+        app's circular gamepad aesthetic (dark translucent fill, thin
+        cyan outline, brighter fill when active).
+      **Not yet tested against real hardware** — same honest caveat as
+      everything else built this session. Good first thing to verify
+      once wiring's confirmed on either test vehicle: load the page,
+      confirm a `DIGITAL_OUTPUT` toggle button actually flips a real
+      pin, before trusting the sliders/audio trigger too.
+
+
+
 - [x] **AUDIO_SIGNAL — the first real test of a "driver beyond simple
       GPIO" role type, built per direct request** (v15 firmware,
       delivered as a zip; app-side changes pushed as commit
