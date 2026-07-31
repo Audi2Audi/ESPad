@@ -1657,6 +1657,31 @@ order of effort vs. value, not a commitment to build all of it:
     stale-TCP-client issue or an unrelated WiFi hiccup, before assuming
     the heap theory is fully confirmed.
 
+- **v16 flash reliability — observed, not root-caused.** On first flash
+  of v16, GPIO 4 (an LED wired for testing) came up driven HIGH at
+  boot, and the AP wasn't broadcasting at all (unreachable from both
+  the app and the web UI) — several power cycles later, it started
+  working normally, including the new Live Controls feature. **v15 was
+  confirmed working immediately beforehand**, isolating this to v16
+  specifically rather than a hardware/wiring issue.
+  Reviewed the v15→v16 diff carefully looking for a cause — it's
+  confined entirely to `webui.h` (`StringPrint` class, two forward
+  declarations, `/api/trigger`, the Live Controls frontend) and doesn't
+  touch `pinMode`/`digitalWrite` on any pin, let alone GPIO 4
+  specifically. No obvious "here's the line" bug found by static
+  review alone. **Genuinely inconclusive** — no Serial Monitor boot log
+  was captured during the bad boots, so there's no actual evidence
+  distinguishing between a few real possibilities: a corrupted/
+  interrupted flash write (unrelated to the code itself), a boot-order
+  race in WiFi/I2S peripheral initialization that happens to resolve
+  after a cold power cycle, or something in v16 genuinely not yet
+  understood. Logged as observed-but-unexplained rather than assumed
+  fixed just because it stopped recurring — if it happens again
+  (especially on a fresh flash of any future version), a Serial
+  Monitor boot log captured at 115200 baud during the bad boot would
+  be the single most useful thing to actually diagnose this, rather
+  than guessing against the source again.
+
 ## Open questions (not yet decided)
 
 - Does "any ESP32 powered device" imply supporting arbitrary
