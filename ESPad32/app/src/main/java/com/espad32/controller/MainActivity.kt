@@ -799,6 +799,92 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
         }
         joystickRight.onReleased = { }
+
+        setupWidgetRelocation(joystickLeft, "layout_joystick_left")
+        setupWidgetRelocation(joystickRight, "layout_joystick_right")
+    }
+
+    // ── Custom layout — long-press-and-drag repositioning ──────────────
+    // Shared by both joysticks (via JoystickView's own relocate
+    // callbacks) and the virtual gamepad cluster (via its own touch
+    // listeners, since it's built from several separate Button views
+    // rather than one custom View that already owns its full touch
+    // handling). Persisted as a plain translation offset (pixels) from
+    // each widget's normal XML/constraint-based position — the default
+    // layout is completely untouched; this only layers a "the user
+    // nudged it by this much" adjustment on top.
+    private val LAYOUT_PREFS_NAME = "espad_layout_prefs"
+
+    private fun loadLayoutOffset(key: String): Pair<Float, Float> {
+        val prefs = getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE)
+        return Pair(prefs.getFloat("${key}_x", 0f), prefs.getFloat("${key}_y", 0f))
+    }
+
+    private fun saveLayoutOffset(key: String, x: Float, y: Float) {
+        getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE).edit()
+            .putFloat("${key}_x", x).putFloat("${key}_y", y).apply()
+    }
+
+    // Keeps a widget's translated position from ever going fully
+    // off-screen — view.left/top/right/bottom are its LAID-OUT bounds
+    // (unaffected by translationX/Y, which is a purely visual offset
+    // applied after layout), so this computes the valid offset range
+    // that keeps those bounds within the parent's bounds.
+    private fun clampOffset(view: android.view.View, dx: Float, dy: Float): Pair<Float, Float> {
+        val parent = view.parent as? android.view.View ?: return Pair(dx, dy)
+        val minX = -view.left.toFloat()
+        val maxX = (parent.width - view.right).toFloat()
+        val minY = -view.top.toFloat()
+        val maxY = (parent.height - view.bottom).toFloat()
+        return Pair(
+            if (maxX >= minX) dx.coerceIn(minX, maxX) else dx,
+            if (maxY >= minY) dy.coerceIn(minY, maxY) else dy
+        )
+    }
+
+    private fun applySavedLayoutOffset(view: android.view.View, key: String) {
+        val (x, y) = loadLayoutOffset(key)
+        view.translationX = x
+        view.translationY = y
+    }
+
+    // Wires a JoystickView's relocate callbacks (see JoystickView.kt) to
+    // actually move the view via translationX/Y, with clamping and
+    // persistence — the joystick handles its own long-press-without-
+    // movement detection internally, this just applies the result.
+    private fun setupWidgetRelocation(view: android.view.View, prefsKey: String) {
+        applySavedLayoutOffset(view, prefsKey)
+        if (view is com.espad32.controller.JoystickView) {
+            var baseX = 0f; var baseY = 0f
+            view.onRelocateModeEntered = {
+                baseX = view.translationX
+                baseY = view.translationY
+                CarLogger.log("Main", "Hold and drag to reposition — release to save.")
+            }
+            view.onRelocateDragged = { dx, dy ->
+                val (clampedX, clampedY) = clampOffset(view, baseX + dx, baseY + dy)
+                view.translationX = clampedX
+                view.translationY = clampedY
+            }
+            view.onRelocateFinished = {
+                saveLayoutOffset(prefsKey, view.translationX, view.translationY)
+                CarLogger.log("Main", "Position saved.")
+            }
+        }
+    }
+
+    // Resets every custom-positioned widget back to its default layout
+    // position — the safety net in case something ends up somewhere
+    // awkward (e.g. a saved offset that doesn't make sense on a
+    // different screen size). Called from Settings.
+    fun resetCustomLayout() {
+        getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE).edit().clear().apply()
+        joystickLeft.translationX = 0f; joystickLeft.translationY = 0f
+        joystickRight.translationX = 0f; joystickRight.translationY = 0f
+        findViewById<android.view.View>(R.id.virtualButtonsContainer)?.let {
+            it.translationX = 0f; it.translationY = 0f
+        }
+        CarLogger.log("Main", "Custom layout reset to defaults.")
     }
 
     private fun applyJoystickVisibility() {
@@ -843,6 +929,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         container.removeAllViews()
         container.orientation = LinearLayout.VERTICAL
         container.gravity = Gravity.CENTER_HORIZONTAL
+        applySavedLayoutOffset(container, "layout_gamepad_cluster")
 
         val faceSize = 52
         val faceRadius = faceSize / 2
@@ -879,18 +966,69 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     topMargin = dp(centerY - sizeDp / 2)
                 }
             }
+
+            // Long-press-without-movement relocates the WHOLE cluster
+            // (not just this one button) — same pattern as
+            // JoystickView's own relocate detection, applied here since
+            // this cluster is built from several separate Button views
+            // rather than one custom View that already owns its touch
+            // handling. The button's normal press already fires
+            // immediately on ACTION_DOWN (matching existing behavior,
+            // no added lag); if relocate mode triggers, that press gets
+            // explicitly released right away rather than left hanging —
+            // otherwise whatever this button is mapped to could get
+            // stuck "on" for the whole drag.
+            var relocateMode = false
+            var downX = 0f; var downY = 0f
+            var baseX = 0f; var baseY = 0f
+            val stationaryThresholdPx = 12f * resources.displayMetrics.density
+            val longPressRunnable = Runnable {
+                if (!relocateMode) {
+                    relocateMode = true
+                    handleGamepadButtonEvent(keyCode, false) // release now, not left stuck "on"
+                    circle.alpha = 0.9f
+                    circle.setBackgroundResource(R.drawable.virtual_button_circle)
+                    circle.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    baseX = container.translationX
+                    baseY = container.translationY
+                    CarLogger.log("Main", "Hold and drag to reposition — release to save.")
+                }
+            }
+
             circle.setOnTouchListener { v, event ->
                 when (event.action) {
                     android.view.MotionEvent.ACTION_DOWN -> {
+                        downX = event.rawX; downY = event.rawY
+                        relocateMode = false
+                        v.postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
                         handleGamepadButtonEvent(keyCode, true)
                         v.alpha = 1f
                         v.setBackgroundResource(R.drawable.virtual_button_circle_pressed)
                         true
                     }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        if (relocateMode) {
+                            val (clampedX, clampedY) = clampOffset(container, baseX + (event.rawX - downX), baseY + (event.rawY - downY))
+                            container.translationX = clampedX
+                            container.translationY = clampedY
+                        } else {
+                            val dx = event.rawX - downX; val dy = event.rawY - downY
+                            if (kotlin.math.sqrt(dx * dx + dy * dy) > stationaryThresholdPx) {
+                                v.removeCallbacks(longPressRunnable) // real movement — not a hold, cancel relocate detection
+                            }
+                        }
+                        true
+                    }
                     android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                        handleGamepadButtonEvent(keyCode, false)
-                        v.alpha = 0.9f
-                        v.setBackgroundResource(R.drawable.virtual_button_circle)
+                        v.removeCallbacks(longPressRunnable)
+                        if (relocateMode) {
+                            saveLayoutOffset("layout_gamepad_cluster", container.translationX, container.translationY)
+                            CarLogger.log("Main", "Position saved.")
+                        } else {
+                            handleGamepadButtonEvent(keyCode, false)
+                            v.alpha = 0.9f
+                            v.setBackgroundResource(R.drawable.virtual_button_circle)
+                        }
                         true
                     }
                     else -> false

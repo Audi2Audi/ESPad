@@ -565,6 +565,27 @@ class SettingsDialogFragment : DialogFragment() {
             PanelTheme.TACTICAL_HUD -> rg.check(R.id.rbHud)
         }
         contentArea?.addView(rg)
+
+        addDivider()
+        addSectionHeader("ON-SCREEN LAYOUT")
+        addHint(
+            "Hold and drag a joystick or the gamepad buttons for a couple " +
+            "of seconds to reposition it anywhere on screen — release to save."
+        )
+        val btnResetLayout = Button(requireContext()).apply {
+            text = "Reset Layout to Defaults"
+            textSize = 12f
+            isAllCaps = false
+            setBackgroundResource(R.drawable.btn_car_bg)
+            setTextColor(0xFFFFFFFF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 40.dp).apply {
+                topMargin = 8.dp
+            }
+        }
+        btnResetLayout.setOnClickListener {
+            (activity as? MainActivity)?.resetCustomLayout()
+        }
+        contentArea?.addView(btnResetLayout)
     }
 
     // ── Controller Tab — embedded controller mapping ──────────────────
