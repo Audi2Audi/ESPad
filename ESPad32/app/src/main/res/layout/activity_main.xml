@@ -161,17 +161,24 @@
 
     <!-- On-screen gamepad buttons — centered between the two joysticks,
          so the app can be fully used without a physical gamepad. Toggled
-         via Settings > Buttons, same pattern as the Joysticks toggle. -->
-    <LinearLayout
+         via Settings > Buttons, same pattern as the Joysticks toggle.
+
+         Deliberately match_parent (covers the whole screen), not
+         wrap_content sized to fit its default content — Android's
+         touch dispatch checks whether a touch point falls within a
+         ViewGroup's OWN bounds before even considering translated
+         children, so a small box here would make a dragged button
+         visible (once clipping was disabled) but genuinely
+         untouchable once it left that box's original small rectangle.
+         Has no background/touch listener of its own, so touches on
+         empty areas correctly fall through to whatever's behind it —
+         this only intercepts touches that actually land on one of its
+         button children. -->
+    <FrameLayout
         android:id="@+id/virtualButtonsContainer"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:layout_marginBottom="24dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/controlPanel"/>
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
 
     <!-- Camera + settings overlay — bottom right, shown when menu hidden, fades with menu -->
     <LinearLayout

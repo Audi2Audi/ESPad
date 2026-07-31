@@ -830,21 +830,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // (unaffected by translationX/Y, which is a purely visual offset
     // applied after layout), so this computes the valid offset range
     // that keeps those bounds within the parent's bounds.
-    // Disables clipChildren on every ViewGroup ancestor from `view` up
-    // to the true root — needed so a button translated far outside its
-    // small immediate parent's bounds (clusterFrame/diamondGroup/
-    // utilityRow, all sized just to fit their DEFAULT positions, not
-    // the whole screen) still actually renders, rather than getting cut
-    // off right at that parent's edge. Every level of the hierarchy
-    // clips independently by default, so this has to walk all the way
-    // up, not just disable it on one or two containers built here.
-    private fun disableClipChildrenUpToRoot(view: android.view.View) {
-        var current: android.view.View? = view
-        while (current is android.view.ViewGroup) {
-            current.clipChildren = false
-            current = current.parent as? android.view.View
-        }
-    }
+    // NOTE: an earlier version had a disableClipChildrenUpToRoot()
+    // helper here, worked around ViewGroups clipping a translated
+    // button's drawing to their own small bounds. Removed, not just
+    // left unused — the underlying problem it solved no longer exists:
+    // renderVirtualButtons() now positions everything directly within
+    // an already full-screen container instead of small intermediate
+    // boxes, so there's no small parent bounds for anything to be
+    // clipped against in the first place.
 
     private fun clampOffset(view: android.view.View, dx: Float, dy: Float): Pair<Float, Float> {
         // Walks all the way up to the true root, accumulating each
@@ -966,31 +959,25 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // between rows without it overlapping the row below. Trade-off
     // made deliberately in favor of matching the requested layout.
     private fun renderVirtualButtons() {
-        val container = findViewById<LinearLayout>(R.id.virtualButtonsContainer) ?: return
+        val container = findViewById<android.widget.FrameLayout>(R.id.virtualButtonsContainer) ?: return
         container.removeAllViews()
-        container.orientation = LinearLayout.VERTICAL
-        // ViewGroups clip their children's drawing to their own bounds
-        // by default — fine normally, but this container (and its own
-        // sub-containers below) are small boxes just sized to fit
-        // their DEFAULT button positions. Once a button is dragged
-        // (via translationX/Y) somewhere outside that small box, the
-        // pixels beyond the box's edge get cut off even though the
-        // button's LOGICAL position is correctly clamped to the whole
-        // screen — confirmed directly from a screenshot showing
-        // buttons visually truncated right at their old container's
-        // edge. Disabled on every ancestor up to the true root (not
-        // just the containers built here), since virtualButtonsContainer
-        // itself is wrap_content-sized in the XML — its OWN parent
-        // would clip a deeply-dragged button too, once it exceeds even
-        // this container's bounds.
-        disableClipChildrenUpToRoot(container)
-        container.gravity = Gravity.CENTER_HORIZONTAL
-        // No longer applies a saved offset to `container` itself — per
-        // direct feedback, "drag the whole cluster together" is gone,
-        // replaced by the more granular behavior below: the diamond
-        // (Y/X/B/A) stays a group that moves together via its own
-        // sub-container, everything else (shoulders, utility row) is
-        // independently draggable, each with its own saved position.
+        // Deliberately no clipChildren handling needed here anymore —
+        // container now genuinely covers the whole screen (see the XML),
+        // so there's no small box for anything to be clipped against in
+        // the first place. Replaces the earlier clipChildren-based fix,
+        // which solved VISIBILITY but not the deeper problem: Android's
+        // touch dispatch checks whether a touch point falls within a
+        // ViewGroup's OWN bounds before even considering translated
+        // children, so a button dragged outside a small parent's
+        // rectangle was visible (once clipping was disabled) but
+        // genuinely unreachable by touch — confirmed directly from
+        // screenshots showing this exact symptom. The only real fix is
+        // for every ancestor between a button and the root to already
+        // be big enough to cover wherever it might get dragged to —
+        // hence eliminating the small intermediate clusterFrame/
+        // utilityRow containers entirely, in favor of positioning
+        // everything directly within this one already-full-screen
+        // container.
 
         val faceSize = 52
         val faceRadius = faceSize / 2
@@ -1001,33 +988,41 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val shoulderHOffset = faceRadius + 6 + shoulderRadius  // X's edge -> shoulder's center
         val shoulderVOffset = shoulderRadius + 3               // half the L1/L2 pair gap
 
-        val clusterWidth = 2 * (hStep + shoulderHOffset + shoulderRadius)
-        val clusterHeight = 2 * (vStep + faceRadius)
-        val cx = clusterWidth / 2
-        val cy = clusterHeight / 2
+        // Fixed default anchor point (DP units, matching every other
+        // measurement here) — replaces the OLD small clusterFrame's own
+        // (cx,cy) center, since there's no more small box to center
+        // things within. An approximation of where the cluster used to
+        // visually sit (roughly centered horizontally, in the lower
+        // portion of the screen) rather than a pixel-precise match —
+        // reasonable given this is a customizable-layout feature to
+        // begin with: anyone who cares about the exact default spot can
+        // just drag it once, and it stays there.
+        val density = resources.displayMetrics.density
+        val screenWidthDp = (resources.displayMetrics.widthPixels / density).toInt()
+        val screenHeightDp = (resources.displayMetrics.heightPixels / density).toInt()
+        val anchorX = screenWidthDp / 2
+        val anchorY = (screenHeightDp * 0.68f).toInt()
 
-        val clusterFrame = android.widget.FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(clusterWidth), dp(clusterHeight))
-            clipChildren = false
-        }
-
-        // Diamond sub-container — Y/X/B/A live inside THIS, not directly
-        // in clusterFrame, specifically so they can share one drag
-        // target and move together as a group while everything else
-        // (placed directly in clusterFrame below) is independent.
+        // Diamond sub-container — Y/X/B/A live inside THIS, positioned
+        // directly in `container` (no intermediate clusterFrame needed
+        // anymore), sized just to fit the 4 face buttons — it doesn't
+        // need to be screen-sized itself, since ITS OWN parent
+        // (container) is already screen-sized, and diamondGroup's own
+        // children (Y/X/B/A) never move relative to it — only
+        // diamondGroup AS A WHOLE gets translated.
         val diamondWidth = 2 * hStep + faceSize
         val diamondHeight = 2 * vStep + faceSize
         val dcx = diamondWidth / 2
         val dcy = diamondHeight / 2
         val diamondGroup = android.widget.FrameLayout(this).apply {
             layoutParams = android.widget.FrameLayout.LayoutParams(dp(diamondWidth), dp(diamondHeight)).apply {
-                leftMargin = dp(cx - diamondWidth / 2)
-                topMargin = dp(cy - diamondHeight / 2)
+                leftMargin = dp(anchorX - diamondWidth / 2)
+                topMargin = dp(anchorY - diamondHeight / 2)
             }
             clipChildren = false
         }
         applySavedLayoutOffset(diamondGroup, "layout_gamepad_diamond")
-        clusterFrame.addView(diamondGroup)
+        container.addView(diamondGroup)
 
         // A single, reusable button-builder — dragTarget decides what
         // actually moves during THIS button's long-press-drag: the
@@ -1126,16 +1121,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         place(KeyEvent.KEYCODE_BUTTON_A, faceSize, 13f, dcx, dcy + vStep, diamondGroup, diamondGroup, "layout_gamepad_diamond")
 
         // Shoulders — tight against the diamond by default, bracketing
-        // the X/B row height — but each independently draggable now
-        // (dragTarget = the button itself, not the diamond or a shared
-        // container), positioned directly in clusterFrame rather than
-        // inside diamondGroup.
+        // the X/B row height — each independently draggable (dragTarget
+        // = the button itself), positioned directly in `container`
+        // (using the screen-wide anchor point, not a small clusterFrame
+        // that no longer exists).
         fun placeIndependent(keyCode: Int, sizeDp: Int, textSizeSp: Float, centerX: Int, centerY: Int, parent: android.view.ViewGroup, prefsKey: String) {
             lateinit var selfRef: android.widget.Button
-            // place() needs the button as its own dragTarget, but that
-            // button doesn't exist until place() creates it — solved by
-            // building it directly here instead of via place(), reusing
-            // the identical logic with dragTarget = the view itself.
             val circle = Button(this).apply {
                 text = shortLabelForKeyCode(keyCode)
                 textSize = textSizeSp
@@ -1212,33 +1203,31 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             parent.addView(circle)
         }
 
-        placeIndependent(KeyEvent.KEYCODE_BUTTON_L1, shoulderSize, 11f, cx - hStep - shoulderHOffset, cy - shoulderVOffset, clusterFrame, "layout_gamepad_l1")
-        placeIndependent(KeyEvent.KEYCODE_BUTTON_L2, shoulderSize, 11f, cx - hStep - shoulderHOffset, cy + shoulderVOffset, clusterFrame, "layout_gamepad_l2")
-        placeIndependent(KeyEvent.KEYCODE_BUTTON_R1, shoulderSize, 11f, cx + hStep + shoulderHOffset, cy - shoulderVOffset, clusterFrame, "layout_gamepad_r1")
-        placeIndependent(KeyEvent.KEYCODE_BUTTON_R2, shoulderSize, 11f, cx + hStep + shoulderHOffset, cy + shoulderVOffset, clusterFrame, "layout_gamepad_r2")
-
-        container.addView(clusterFrame)
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_L1, shoulderSize, 11f, anchorX - hStep - shoulderHOffset, anchorY - shoulderVOffset, container, "layout_gamepad_l1")
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_L2, shoulderSize, 11f, anchorX - hStep - shoulderHOffset, anchorY + shoulderVOffset, container, "layout_gamepad_l2")
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_R1, shoulderSize, 11f, anchorX + hStep + shoulderHOffset, anchorY - shoulderVOffset, container, "layout_gamepad_r1")
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_R2, shoulderSize, 11f, anchorX + hStep + shoulderHOffset, anchorY + shoulderVOffset, container, "layout_gamepad_r2")
 
         // Select/L3/R3/Start — same independent-dragging treatment,
-        // still visually a small row below the diamond by default, but
-        // each one now separately repositionable rather than fixed in
-        // that row (or, previously, sharing the whole-cluster drag).
-        val utilityRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            clipChildren = false
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(10) }
-        }
-        val utilityKeys = mapOf(
+        // positioned directly in `container` as a row below the
+        // diamond by default (no intermediate utilityRow LinearLayout
+        // anymore — explicit per-button coordinates instead of relying
+        // on LinearLayout's automatic horizontal flow).
+        val utilityButtonSize = 28
+        val utilityGap = 6
+        val utilityStep = utilityButtonSize + utilityGap
+        val utilityTotalWidth = 4 * utilityButtonSize + 3 * utilityGap
+        val utilityStartX = anchorX - utilityTotalWidth / 2 + utilityButtonSize / 2
+        val utilityY = anchorY + vStep + faceRadius + 10 + utilityButtonSize / 2
+        val utilityKeys = listOf(
             KeyEvent.KEYCODE_BUTTON_SELECT to "layout_gamepad_select",
             KeyEvent.KEYCODE_BUTTON_THUMBL to "layout_gamepad_l3",
             KeyEvent.KEYCODE_BUTTON_THUMBR to "layout_gamepad_r3",
             KeyEvent.KEYCODE_BUTTON_START to "layout_gamepad_start"
         )
-        utilityKeys.forEach { (kc, prefsKey) ->
+        utilityKeys.forEachIndexed { index, (kc, prefsKey) ->
             lateinit var selfRef: android.widget.Button
+            val centerX = utilityStartX + index * utilityStep
             val b = Button(this).apply {
                 text = shortLabelForKeyCode(kc)
                 textSize = 8f
@@ -1249,7 +1238,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 setBackgroundResource(R.drawable.virtual_button_circle)
                 setTextColor(Color.parseColor("#8A939C"))
                 alpha = 0.8f
-                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(6) }
+                layoutParams = android.widget.FrameLayout.LayoutParams(dp(utilityButtonSize), dp(utilityButtonSize)).apply {
+                    leftMargin = dp(centerX - utilityButtonSize / 2)
+                    topMargin = dp(utilityY - utilityButtonSize / 2)
+                }
             }
             selfRef = b
             applySavedLayoutOffset(b, prefsKey)
@@ -1306,9 +1298,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     else -> false
                 }
             }
-            utilityRow.addView(b)
+            container.addView(b)
         }
-        container.addView(utilityRow)
     }
 
     private fun shortLabelForKeyCode(keyCode: Int): String = when (keyCode) {
