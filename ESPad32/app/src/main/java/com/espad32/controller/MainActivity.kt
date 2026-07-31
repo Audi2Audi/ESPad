@@ -884,7 +884,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     android.view.MotionEvent.ACTION_DOWN -> {
                         handleGamepadButtonEvent(keyCode, true)
                         v.alpha = 1f
-                        v.setBackgroundColor(Color.parseColor("#8000E5FF"))
+                        v.setBackgroundResource(R.drawable.virtual_button_circle_pressed)
                         true
                     }
                     android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
