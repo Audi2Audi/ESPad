@@ -70,6 +70,16 @@ object DeviceCommand {
     }
 
     /**
+     * Sets this device's friendly name, used in UDP discovery replies
+     * instead of the always-identical AP SSID — solves the case where
+     * 2+ devices on the network would otherwise show up looking
+     * identical in the discovery picker (distinguishable only by IP).
+     */
+    fun sendSetDeviceName(name: String, onResult: (String?) -> Unit) {
+        sendRaw("CMD_SET_NAME#$name\n", onResult)
+    }
+
+    /**
      * Sends any single-line command (a SET command, or a full JSON pin
      * config payload — both are just one line ending in \n) and captures
      * the device's first response line. For multi-line firmware replies

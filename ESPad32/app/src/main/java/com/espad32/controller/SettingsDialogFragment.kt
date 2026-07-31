@@ -211,6 +211,48 @@ class SettingsDialogFragment : DialogFragment() {
     }
 
     private fun buildWifiTab() {
+        // Device name — helps tell devices apart in UDP discovery when
+        // 2+ are on the network at once (previously every device
+        // reported the same identical AP_SSID as its "name," making
+        // them indistinguishable except by IP in the discovery picker).
+        contentArea?.addView(TextView(requireContext()).apply {
+            text = "Device Name"
+            textSize = 11f
+            setTextColor(0xFF5F6A73.toInt())
+            setPadding(0, 0, 0, 4)
+        })
+        val etDeviceName = EditText(requireContext()).apply {
+            hint = "e.g. Train, RC Car"
+            setTextColor(0xFFFFFFFF.toInt()); setHintTextColor(0xFF555555.toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        contentArea?.addView(etDeviceName)
+        val btnSaveDeviceName = Button(requireContext()).apply {
+            text = "Save Name"
+            textSize = 12f
+            isAllCaps = false
+            setBackgroundResource(R.drawable.btn_car_bg)
+            setTextColor(0xFFFFFFFF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 40.dp).apply {
+                topMargin = 8.dp; bottomMargin = 16.dp
+            }
+        }
+        btnSaveDeviceName.setOnClickListener {
+            val name = etDeviceName.text.toString().trim()
+            com.espad32.controller.controls.DeviceCommand.sendSetDeviceName(name) { response ->
+                activity?.runOnUiThread {
+                    if (response?.startsWith("CMD_NAME#") == true) {
+                        android.widget.Toast.makeText(requireContext(), "Device name saved.", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        android.widget.Toast.makeText(requireContext(), "Could not save name — check connection.", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+        contentArea?.addView(btnSaveDeviceName)
+
         // Status display
         val tvStatus = TextView(requireContext()).apply {
             text = "Status: querying…"
@@ -246,7 +288,19 @@ class SettingsDialogFragment : DialogFragment() {
                         }
                     }
                 }
-                MainTcpHolder.onNextData = null
+                // Chained AFTER the WiFi status response, not fired
+                // independently alongside it — both requests share the
+                // one TCP connection, so firing them at the same time
+                // risks their responses arriving out of order and each
+                // getting caught by the wrong listener.
+                MainTcpHolder.onNextData = { nameData ->
+                    if (nameData.startsWith("CMD_NAME#")) {
+                        val name = nameData.substringAfter("CMD_NAME#").trim()
+                        activity?.runOnUiThread { etDeviceName.setText(name) }
+                    }
+                    MainTcpHolder.onNextData = null
+                }
+                MainTcpHolder.enqueue?.invoke("CMD_GET_NAME\n")
             }
         }
         MainTcpHolder.enqueue?.invoke("CMD_WIFI_STATUS#\n")
