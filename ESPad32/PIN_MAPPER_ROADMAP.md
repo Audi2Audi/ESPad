@@ -84,6 +84,39 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Flagged (not fixed): "Flash Default" is one static binary, but
+      `Boards.ALL` now spans multiple chip architectures — not a
+      uniform gap, worth being precise about severity per board rather
+      than one blanket warning.** The uploaded `espad_default_firmware.bin`
+      was compiled targeting the original ESP32 (D1 Mini32).
+      - **D1 Mini32, ESP32 DevKit V1, ESP32-CAM (AI-Thinker)** — all
+        the same underlying chip (original ESP32, Xtensa LX6). The
+        binary would actually boot and run on these, but its baked-in
+        assumptions (I2S pins at 26/25/22, whatever GPIOs the compiled
+        role config points at) reflect the D1 Mini32's layout
+        specifically — could land on reserved/wrong pins for the
+        others (camera pins on ESP32-CAM, for instance), not a clean
+        "just works."
+      - **ESP32-S3** — a genuinely different chip variant (Xtensa LX7,
+        different peripheral register map) — needs its own Arduino IDE
+        board selection and its own compiled binary. Flashing the D1
+        binary here would not run correctly at all, not just have
+        wrong pins.
+      - **ESP32-C3** — RISC-V, a completely different instruction set
+        from Xtensa. Flashing the D1 binary here wouldn't boot at
+        all — this isn't a "wrong pins" problem, it's not the same CPU.
+      **Not urgent right now** — D1 Mini32 is the only board actually
+      in use for real testing. **What a real fix would look like,
+      whenever this matters:** either bundle a separate compiled
+      binary per chip architecture family and have "Flash Default"
+      pick the right one based on the currently active board, or
+      restrict/disable "Flash Default" entirely unless the active
+      board matches what was actually compiled — surfacing a clear
+      warning rather than silently offering a binary that's wrong (or
+      outright won't boot) for whatever board is currently selected.
+
+
+
 - [x] **Live Controls in the web UI — actually control the device from
       a browser, no phone needed** (v16 firmware, delivered as a zip).
       Requested as "a copy of the on-screen gamepad controls in the
