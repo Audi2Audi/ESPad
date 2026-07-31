@@ -84,6 +84,49 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **User-settable device name — fixes a real UDP discovery gap
+      found by direct investigation** (v17 firmware, delivered as a
+      zip; app-side pushed as `7dd9994`). Every device previously
+      reported the identical hardcoded `AP_SSID` as its "name" in
+      discovery replies — with 2+ devices on the network at once, the
+      existing "Select a device" picker (already correctly built,
+      confirmed working — collects all distinct replies, doesn't just
+      grab the first one) would show entries like "ESPad_Test
+      (192.168.4.1)" / "ESPad_Test (192.168.4.2)": technically
+      distinguishable by IP, not meaningfully by name.
+      - **Firmware**: new `device_identity.h` — a genuinely separate
+        header from `board_defs.h` despite sharing the same `Preferences`
+        storage pattern (`"espad_meta"` namespace), since "which board"
+        and "what's this device called" are different concepts.
+        `discovery.h`'s reply now uses the settable name, falling back
+        to `AP_SSID` only if none has been set. New TCP commands
+        `CMD_SET_NAME#<name>` / `CMD_GET_NAME`, and matching web UI
+        endpoints `GET`/`POST /api/name` (folded into the existing
+        "Board" section, retitled "Device," since they're both one-time
+        device-identity settings).
+      - **App**: new `DeviceCommand.sendSetDeviceName()`, and a Device
+        Name field in Settings' WiFi tab. **Real ordering bug caught
+        and fixed while building this**: the name query needed to be
+        chained AFTER the existing WiFi status query's response
+        arrives, not fired independently alongside it — both share one
+        TCP connection, and firing both at once risked their responses
+        arriving out of order, each getting caught by the wrong
+        listener (the WiFi status handler catching the name reply, or
+        vice versa).
+      - **A second, unrelated bug caught in the same pass**: a
+        `str_replace` mid-edit left stray leftover closing braces and a
+        duplicate `MainTcpHolder.enqueue` call from the original file
+        structure — caught by a full brace-balance check on the whole
+        file afterward, not by re-reading the diff and assuming it was
+        clean. Consistent with the same verification discipline
+        established after the earlier WiFi-handlers mistake this
+        session.
+      - Both the app (Settings' WiFi tab) and the web UI ("Device"
+        section) can set the name — same "equally valid front doors"
+        pattern already used for WiFi/board selection.
+
+
+
 - [x] **"Flash Default" is now board-aware — disabled with a clear
       explanation unless the active board is one the bundled binary
       was actually verified for, rather than one static binary offered
