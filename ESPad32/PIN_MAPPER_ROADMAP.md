@@ -84,6 +84,51 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Customizable on-screen layout — hold and drag to reposition
+      joysticks and the gamepad button cluster anywhere on screen**
+      (app-only, no firmware involved). Persisted per-widget in
+      `SharedPreferences`, safety-netted with a "Reset Layout to
+      Defaults" button in Settings' Theme tab.
+      - **The real design problem this needed solving**: a joystick
+        can't tolerate ANY added lag before knob-movement starts —
+        driving needs immediate response on touch-down. Solved by
+        layering a SEPARATE, concurrent long-press-without-movement
+        check on top of the existing immediate knob-drag behavior,
+        rather than delaying knob-drag to first check "is this a long
+        press." Real steering involves immediate, intentional
+        movement and essentially never triggers the "stayed still for
+        500ms" condition by accident — only a deliberate hold does.
+        Normal joystick use is completely unaffected.
+      - **Joysticks**: the long-press detection lives directly inside
+        `JoystickView`'s own touch handling (it already owns its full
+        touch event stream, no child-view conflicts to arbitrate).
+      - **Gamepad buttons**: same pattern, but applied per-button
+        (`place()`'s existing touch listeners) rather than at the
+        cluster level, since the cluster is built from several
+        separate `Button` views, not one custom View. Long-press on
+        ANY button relocates the WHOLE cluster container together, not
+        just that one button. **Real correctness fix needed here**:
+        a button's press already fires immediately on `ACTION_DOWN`
+        (unchanged) — entering relocate mode now explicitly RELEASES
+        that press right away, rather than leaving whatever it's
+        mapped to stuck "on" for the entire drag.
+      - **A real coordinate-space bug caught and fixed before
+        shipping**: the relocate-drag delta must use raw (screen-
+        absolute) coordinates, not a view's own local coordinates —
+        local coordinates are relative to the view's OWN position,
+        which is exactly what's changing during a relocate-drag,
+        creating a feedback loop where moving the view shifts what
+        "local" means for the next event. The gamepad button
+        implementation used raw coordinates correctly from the start;
+        `JoystickView` initially didn't and was caught and fixed
+        before this was committed.
+      - Offsets are clamped so a widget's translated bounds can't be
+        dragged fully off-screen — doesn't prevent overlapping other
+        elements (that's the point of customizing layout), just
+        prevents losing a widget somewhere ungrabbable.
+
+
+
 - [x] **Device name auto-defaults to the profile name — a novice user
       never needs to find the manual name field at all** (v18
       firmware, delivered as a zip; app-side pushed as `b67c972`).
