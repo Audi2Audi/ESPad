@@ -163,20 +163,48 @@ originally written, now corrected above for motors/servos):**
         cause from the clamping bug above: Android `ViewGroup`s clip
         their children's DRAWING to their own bounds by default,
         independent of whether the child's LOGICAL position (its
-        translation) is otherwise valid. The clamping fix correctly
-        allowed a button to be positioned anywhere on screen, but its
-        actual pixels still got cut off the moment they extended past
-        `clusterFrame`/`diamondGroup`/`utilityRow`'s own small
-        rectangle. Fixed on two fronts, since clipping happens
-        independently at every level of the hierarchy: `clipChildren
-        = false` set directly on those three containers (handles
-        clipping within the gamepad's own internal structure), plus a
-        new `disableClipChildrenUpToRoot()` helper walking from
-        `virtualButtonsContainer` up to the true root (handles the
-        OTHER direction — needed since that container is itself
-        `wrap_content`-sized in the XML, so ITS OWN parent would also
-        clip a deeply-dragged button once it exceeds even the
-        container's bounds).
+        translation) is otherwise valid. Fixed with `clipChildren =
+        false` on the small intermediate containers, plus a helper
+        walking up to the true root.
+      - **A third, deeper bug, reported directly after the clipping
+        fix**: buttons became visible outside their original box (the
+        clipping fix worked), but stopped being touchable there —
+        long-press-to-relocate no longer worked once a button was
+        dragged past that boundary. This is a genuinely different, more
+        fundamental issue than the previous two: Android's touch
+        dispatch checks whether a touch point falls within a
+        `ViewGroup`'s OWN bounds *before even considering translated
+        children at all*. Disabling clipping fixed the DRAWING; it did
+        nothing for touch — the intermediate containers
+        (`clusterFrame`/`diamondGroup`/`utilityRow`) were small boxes
+        sized just to fit their default content, so once a button was
+        dragged outside that small rectangle, the touch event's
+        ancestor chain never even offered that point down to the
+        button in the first place, regardless of clipping settings.
+        **The only real fix**: every ancestor between a button and the
+        root needs to already be big enough to cover wherever it might
+        get dragged to — not a settings flag, a structural requirement.
+        Restructured accordingly: `virtualButtonsContainer` changed
+        from a `wrap_content` `LinearLayout` to a `match_parent`
+        `FrameLayout` (genuinely covers the whole screen, with no
+        background/touch listener of its own, so empty areas still
+        correctly pass touches through to whatever's behind them), and
+        the small intermediate `clusterFrame`/`utilityRow` containers
+        were eliminated entirely — `diamondGroup` and all 8
+        independent buttons now live directly in this one already-
+        full-screen container. The old small-box-relative `(cx,cy)`
+        origin was replaced with a fixed anchor point computed from
+        actual screen dimensions — a reasonable approximation of the
+        old default visual position, not a pixel-precise match
+        (acceptable given this is a customizable-layout feature to
+        begin with — anyone who cares about the exact spot can just
+        drag it once). The `disableClipChildrenUpToRoot()` helper from
+        the previous fix was removed as genuinely obsolete, not merely
+        unused — the class of problem it solved doesn't exist in this
+        flatter architecture. `clampOffset()` needed no changes at
+        all — it was already written to walk up through any depth of
+        nesting, so it worked correctly against both the old deep
+        hierarchy and this new flatter one without modification.
 
 
 
