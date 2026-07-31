@@ -935,9 +935,34 @@ class PinMapperActivity : AppCompatActivity() {
         com.espad32.controller.controls.DeviceCommand.sendRaw(payload.toString()) { response ->
             when {
                 response == null -> log("No response from device (check connection).")
-                response.startsWith("VALIDATION OK") -> log("Device confirmed: $response")
+                response.startsWith("VALIDATION OK") -> {
+                    log("Device confirmed: $response")
+                    maybeSetDefaultDeviceName()
+                }
                 response.startsWith("NACK") -> log("Device rejected config: $response")
                 else -> log("Device response: $response")
+            }
+        }
+    }
+
+    // If the device has never had a name explicitly set, defaults it to
+    // this profile's display name — a novice user gets a meaningful
+    // discovery name (e.g. "Train" instead of a generic fallback)
+    // without ever needing to find the Settings/web UI name field at
+    // all. Checks the RAW stored name first (see the matching firmware
+    // fix — CMD_GET_NAME now returns the actual stored value, not a
+    // display-with-fallback version) so a name someone genuinely set
+    // is never silently overwritten, even if it happens to differ from
+    // the current profile's display name.
+    private fun maybeSetDefaultDeviceName() {
+        com.espad32.controller.controls.DeviceCommand.sendRaw("CMD_GET_NAME\n") { nameResponse ->
+            val currentName = nameResponse?.substringAfter("CMD_NAME#", "")?.trim() ?: ""
+            if (currentName.isBlank()) {
+                com.espad32.controller.controls.DeviceCommand.sendSetDeviceName(currentProfile.displayName) { setResponse ->
+                    if (setResponse?.startsWith("CMD_NAME#") == true) {
+                        log("Device name defaulted to \"${currentProfile.displayName}\".")
+                    }
+                }
             }
         }
     }
