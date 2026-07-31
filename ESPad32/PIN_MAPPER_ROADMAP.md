@@ -84,6 +84,42 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Device name auto-defaults to the profile name — a novice user
+      never needs to find the manual name field at all** (v18
+      firmware, delivered as a zip; app-side pushed as `b67c972`).
+      Direct follow-up to the previous device-name feature (v17): that
+      one required actively visiting Settings/the web UI to set a
+      name at all, which a novice user realistically wouldn't do.
+      - **Required a fix to what v17 shipped, not just an addition**:
+        `CMD_GET_NAME` and the web UI's `GET /api/name` both returned
+        `device_getDisplayName()` — the AP_SSID-fallback version — which
+        meant a caller could never actually tell "never set" apart
+        from "user genuinely set it to something." Changed both to
+        return the raw stored value instead (possibly blank),
+        consistent between both front doors. `discovery.h`'s actual
+        broadcast reply still correctly uses the fallback version —
+        that one genuinely needs to show *something* even if unset,
+        unlike this new auto-default logic which needs to know the
+        difference.
+      - **App**: Pin Mapper's `validateAndSave()` — the one place that
+        currently pushes config to a live device — now chains a
+        `CMD_GET_NAME` check after a successful push, and only if the
+        raw stored name is blank, follows up with
+        `CMD_SET_NAME#<profile displayName>`. A name someone
+        deliberately set is never silently overwritten, even if it
+        happens to differ from the profile's current display name.
+      **Known coverage gap, not introduced by this change, worth being
+      upfront about rather than letting it be silently incomplete**:
+      the Guided Setup wizard never talks to a live device at all —
+      it only saves config locally on the phone. Since this new hook
+      lives specifically in `validateAndSave()`, someone who uses only
+      the wizard and never separately visits Pin Mapper wouldn't get
+      the auto-default at all. Not fixed here — giving the wizard a
+      real device-push step is a separate, bigger piece of work than
+      today's ask.
+
+
+
 - [x] **User-settable device name — fixes a real UDP discovery gap
       found by direct investigation** (v17 firmware, delivered as a
       zip; app-side pushed as `7dd9994`). Every device previously
