@@ -156,6 +156,27 @@ originally written, now corrected above for motors/servos):**
         confirm this produces the identical result there (no
         intermediate ancestors to walk through, so the fix is a no-op
         for them), not just assumed no regression.
+      - **A second bug, also found via a screenshot, immediately after
+        fixing the first**: buttons dragged outside their ORIGINAL
+        small box became invisible — partial/ghost circles visible,
+        cut off right at the old container's edge. Different root
+        cause from the clamping bug above: Android `ViewGroup`s clip
+        their children's DRAWING to their own bounds by default,
+        independent of whether the child's LOGICAL position (its
+        translation) is otherwise valid. The clamping fix correctly
+        allowed a button to be positioned anywhere on screen, but its
+        actual pixels still got cut off the moment they extended past
+        `clusterFrame`/`diamondGroup`/`utilityRow`'s own small
+        rectangle. Fixed on two fronts, since clipping happens
+        independently at every level of the hierarchy: `clipChildren
+        = false` set directly on those three containers (handles
+        clipping within the gamepad's own internal structure), plus a
+        new `disableClipChildrenUpToRoot()` helper walking from
+        `virtualButtonsContainer` up to the true root (handles the
+        OTHER direction — needed since that container is itself
+        `wrap_content`-sized in the XML, so ITS OWN parent would also
+        clip a deeply-dragged button once it exceeds even the
+        container's bounds).
 
 
 
