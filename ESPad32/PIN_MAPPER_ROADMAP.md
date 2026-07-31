@@ -939,6 +939,89 @@ originally written, now corrected above for motors/servos):**
 
 ## Future idea, not started
 
+- **Broader vision, stated directly and worth recording precisely: this
+  app becoming "as universal as reasonably possible"** — real compiled
+  firmware for every board the app already defines pin layouts for
+  (not just D1 Mini32), and potentially non-ESP32 (Arduino-branded)
+  boards eventually. Two genuinely different scopes bundled in that
+  one sentence, worth separating clearly rather than treating as one
+  task, since their feasibility is wildly different.
+
+  **Near-term, concrete: real per-chip-family firmware for the other
+  ESP32-family boards already defined in `Boards.ALL`.** Directly
+  follows from "Flash Default" just becoming board-aware (disabled
+  rather than silently wrong for unsupported boards) — the natural
+  next step is making MORE boards actually supported, not just
+  correctly refusing the ones that aren't.
+  - **ESP32 DevKit V1** — same chip as D1 Mini32 (Xtensa LX6). The
+    existing binary would likely run as-is; the real work is
+    *verifying* that claim on actual DevKit V1 hardware (pin-by-pin,
+    given the I2S/audio pins especially are D1-Mini32-specific
+    assumptions) before adding it to the supported set — not assuming
+    "same chip" is sufficient, per the reasoning already applied when
+    `DEFAULT_FIRMWARE_SUPPORTED_BOARDS` was deliberately kept narrow.
+  - **ESP32-CAM (AI-Thinker)** — same chip family too, but genuinely
+    needs its own verification pass given camera-reserved pins
+    (confirmed in `board_defs.h`'s `ESP32_CAM_RESERVED` list) could
+    conflict with whatever the compiled role config or I2S pins
+    assume — more than a rebuild, a real check that nothing collides.
+  - **ESP32-S3** — a different chip variant (Xtensa LX7, different
+    peripheral register map) needing its own Arduino IDE board
+    selection and its own compiled `.bin`, not just a recompile flag.
+    Likely needs genuine compile-testing against the S3 target to
+    confirm the existing source (I2S, LEDC, ESP32Servo, WiFi/web
+    server code) builds cleanly — probably does, given how much of
+    this already goes through portable Arduino-ESP32 core APIs rather
+    than chip-specific register access, but "probably" isn't
+    "confirmed," and this hasn't been tested on real S3 hardware at
+    all yet.
+  - **ESP32-C3** — RISC-V, not Xtensa at all — the biggest lift of the
+    four, since it's not just "a different chip variant" but a
+    genuinely different instruction set architecture requiring its own
+    full compile-and-verify pass, not an assumption that anything
+    carries over cleanly from the Xtensa-based boards.
+  - **What "done" looks like for this piece**: a genuinely separate
+    compiled `.bin` per chip architecture family (not per individual
+    board — D1 Mini32/DevKit V1/ESP32-CAM could plausibly share ONE
+    Xtensa-LX6 binary once verified, distinct from an S3 binary and a
+    C3 binary), with "Flash Default" picking the right one based on
+    the active board rather than the current single-binary-or-disabled
+    state.
+
+  **Longer-term, genuinely more speculative: non-ESP32 (Arduino-
+  branded) board support.** Worth being honest that this is a much
+  bigger leap than the ESP32-family work above, not a natural
+  extension of it — and that "Arduino board" needs its own definition
+  before this is even a well-formed goal, since the answer differs
+  enormously depending which:
+  - **Classic AVR Arduino boards (Uno, Nano, Mega, etc.)** — no
+    built-in WiFi at all, which this entire framework's architecture
+    depends on (the AP, the TCP command channel, the embedded web
+    server). Would need external WiFi hardware (a shield, an ESP8266
+    co-processor) just to have a network to be reachable on at all —
+    a fundamentally different connectivity model, not a firmware
+    recompile. Separately, RAM/flash are vastly smaller (an Uno has
+    2KB RAM, 32KB flash total, vs. this ESP32 firmware alone needing
+    roughly 18.8KB just for one embedded audio clip) — the current
+    architecture (`ArduinoJson`, a multi-KB embedded HTML/JS web page,
+    audio clips baked into flash) would not fit at all, not just need
+    trimming. Realistically means dropping major features entirely for
+    this class of board, not porting them.
+  - **WiFi-capable Arduino-branded boards (Arduino Nano ESP32, Arduino
+    UNO R4 WiFi, etc.)** — a much more reasonable candidate if "Arduino
+    support" is what's actually meant, since these either ARE an ESP32
+    under a different brand name (Nano ESP32) or have comparable
+    WiFi/RAM/flash characteristics to what this firmware already
+    assumes. This is genuinely closer in spirit to "another ESP32-
+    family board" than to "support Arduino" as commonly understood.
+  - **Recommendation, if/when this becomes a real want rather than a
+    someday-maybe**: clarify which definition of "Arduino board" is
+    actually meant first — the answer completely changes whether this
+    is "add a few more boards to a list" or "redesign the architecture
+    for a fundamentally more constrained platform."
+
+
+
 - **Incorporating the Freenove car's LED matrix face display.**
   Logged as an option-space, not a commitment to build — raised as a
   direct question, worth recording the reasoning rather than
