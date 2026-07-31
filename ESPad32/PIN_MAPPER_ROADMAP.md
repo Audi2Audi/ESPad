@@ -140,6 +140,22 @@ originally written, now corrected above for motors/servos):**
         dragged fully off-screen — doesn't prevent overlapping other
         elements (that's the point of customizing layout), just
         prevents losing a widget somewhere ungrabbable.
+      - **Real bug found and fixed via a screenshot, after the initial
+        diamond-vs-independent split shipped**: gamepad buttons could
+        only be dragged within a small rectangle, not the whole
+        screen. `clampOffset()` was using the button's IMMEDIATE
+        parent's width/height as the screen bounds — correct for
+        joysticks (direct children of the actual root layout, so their
+        "immediate parent" already IS the full screen), but wrong for
+        gamepad buttons nested inside small sub-containers
+        (`clusterFrame`/`diamondGroup`/`utilityRow`) sized just to fit
+        their own children. Fixed by walking all the way up to the
+        true root, accumulating each intermediate ancestor's own
+        layout position, rather than only checking the immediate
+        parent — traced through the joystick case specifically to
+        confirm this produces the identical result there (no
+        intermediate ancestors to walk through, so the fix is a no-op
+        for them), not just assumed no regression.
 
 
 
