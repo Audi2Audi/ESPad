@@ -831,11 +831,33 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // applied after layout), so this computes the valid offset range
     // that keeps those bounds within the parent's bounds.
     private fun clampOffset(view: android.view.View, dx: Float, dy: Float): Pair<Float, Float> {
-        val parent = view.parent as? android.view.View ?: return Pair(dx, dy)
-        val minX = -view.left.toFloat()
-        val maxX = (parent.width - view.right).toFloat()
-        val minY = -view.top.toFloat()
-        val maxY = (parent.height - view.bottom).toFloat()
+        // Walks all the way up to the true root, accumulating each
+        // intermediate ancestor's own layout position — needed because
+        // a gamepad button's IMMEDIATE parent (clusterFrame,
+        // diamondGroup, utilityRow) is a small box sized just to fit
+        // its own children, not the actual screen. Clamping against
+        // that confined dragging to a small region instead of the
+        // whole screen — confirmed directly from a screenshot showing
+        // buttons stuck inside that box. Joysticks were never affected
+        // by this, since they're direct children of the root layout
+        // already (their "immediate parent" already IS the screen-
+        // sized root, so the old logic happened to be correct for
+        // them by coincidence).
+        var cumulativeLeft = view.left
+        var cumulativeTop = view.top
+        var current = view.parent as? android.view.View ?: return Pair(dx, dy)
+        while (true) {
+            val next = current.parent as? android.view.View ?: break
+            cumulativeLeft += current.left
+            cumulativeTop += current.top
+            current = next
+        }
+        val root = current // the last view whose parent wasn't a View — the true root
+
+        val minX = -cumulativeLeft.toFloat()
+        val maxX = (root.width - cumulativeLeft - view.width).toFloat()
+        val minY = -cumulativeTop.toFloat()
+        val maxY = (root.height - cumulativeTop - view.height).toFloat()
         return Pair(
             if (maxX >= minX) dx.coerceIn(minX, maxX) else dx,
             if (maxY >= minY) dy.coerceIn(minY, maxY) else dy
