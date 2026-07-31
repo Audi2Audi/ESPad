@@ -337,6 +337,19 @@ object Boards {
     internal val customBoardsCache = mutableListOf<BoardDef>()
 
     fun byKey(key: String): BoardDef = (ALL + customBoardsCache).find { it.key == key } ?: D1_MINI32
+
+    // Which board(s) the bundled espad_default_firmware.bin ("Flash
+    // Default") was actually compiled for and verified against — NOT
+    // every board this app can define pin layouts for. D1 Mini32 and
+    // ESP32 DevKit V1/ESP32-CAM share the same underlying chip (so the
+    // binary would technically boot on those too), but its pin
+    // assumptions (I2S at 26/25/22, wherever the compiled role config
+    // points) reflect the D1 Mini32 specifically — conservative here
+    // rather than assuming "same chip" means "same binary is fine."
+    // ESP32-S3/C3 are genuinely different chip architectures the
+    // binary won't even run on correctly (S3) or boot on at all (C3,
+    // RISC-V) — see PIN_MAPPER_ROADMAP.md.
+    val DEFAULT_FIRMWARE_SUPPORTED_BOARDS = setOf("d1_mini32")
 }
 
 // Merges built-in boards with user-defined ones (CustomBoardStorage)

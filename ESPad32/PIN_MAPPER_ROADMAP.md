@@ -84,19 +84,23 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
-- [x] **Flagged (not fixed): "Flash Default" is one static binary, but
-      `Boards.ALL` now spans multiple chip architectures — not a
-      uniform gap, worth being precise about severity per board rather
-      than one blanket warning.** The uploaded `espad_default_firmware.bin`
-      was compiled targeting the original ESP32 (D1 Mini32).
+- [x] **"Flash Default" is now board-aware — disabled with a clear
+      explanation unless the active board is one the bundled binary
+      was actually verified for, rather than one static binary offered
+      unconditionally regardless of `Boards.ALL` spanning multiple chip
+      architectures.** Kept `DEFAULT_FIRMWARE_SUPPORTED_BOARDS`
+      deliberately conservative — just `d1_mini32`, not the whole
+      original-ESP32 family it happens to share a chip with:
       - **D1 Mini32, ESP32 DevKit V1, ESP32-CAM (AI-Thinker)** — all
         the same underlying chip (original ESP32, Xtensa LX6). The
         binary would actually boot and run on these, but its baked-in
         assumptions (I2S pins at 26/25/22, whatever GPIOs the compiled
         role config points at) reflect the D1 Mini32's layout
         specifically — could land on reserved/wrong pins for the
-        others (camera pins on ESP32-CAM, for instance), not a clean
-        "just works."
+        others (camera pins on ESP32-CAM, for instance). Deliberately
+        NOT included in the supported set despite sharing a chip —
+        "would boot" isn't the same as "verified correct," and being
+        conservative here costs nothing.
       - **ESP32-S3** — a genuinely different chip variant (Xtensa LX7,
         different peripheral register map) — needs its own Arduino IDE
         board selection and its own compiled binary. Flashing the D1
@@ -105,15 +109,26 @@ originally written, now corrected above for motors/servos):**
       - **ESP32-C3** — RISC-V, a completely different instruction set
         from Xtensa. Flashing the D1 binary here wouldn't boot at
         all — this isn't a "wrong pins" problem, it's not the same CPU.
-      **Not urgent right now** — D1 Mini32 is the only board actually
-      in use for real testing. **What a real fix would look like,
-      whenever this matters:** either bundle a separate compiled
-      binary per chip architecture family and have "Flash Default"
-      pick the right one based on the currently active board, or
-      restrict/disable "Flash Default" entirely unless the active
-      board matches what was actually compiled — surfacing a clear
-      warning rather than silently offering a binary that's wrong (or
-      outright won't boot) for whatever board is currently selected.
+      **Implementation**: new `Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS`
+      constant, checked in both places "Flash Default" independently
+      exists — `OtaActivity` and Settings' OTA tab (the same pre-
+      existing duplication noted elsewhere in this doc, still not
+      consolidated, but both kept consistent with this same check
+      rather than fixing one and leaving the other stale). A dedicated,
+      persistent text view (`tvDefaultBoardSupport`) shows which
+      board(s) are supported either way — always visible, not just
+      when something's wrong — since `OtaActivity`'s existing `tvInfo`
+      gets overwritten constantly by other transient status messages
+      and would have made the note disappear the moment anything else
+      happened on screen.
+      **A real bypass caught and fixed while implementing this**:
+      `OtaActivity` has a second path that auto-flashes when launched
+      from Settings with a `flashDefault` intent extra — this called
+      `flashFromAssets()` directly, completely independent of the
+      button's disabled state, meaning the UI could show "disabled,
+      unsupported board" while a different entry point flashed it
+      anyway. Gated with the same board-compatibility check rather
+      than left as a silent bypass of the safety just added.
 
 
 

@@ -50,6 +50,10 @@
                 android:layout_width="match_parent" android:layout_height="48dp"
                 android:text="⭐  Flash Default Firmware"
                 android:textSize="14sp" style="@style/CarButton"
+                android:layout_marginBottom="8dp"/>
+            <TextView android:id="@+id/tvDefaultBoardSupport"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:textColor="#8A939C" android:textSize="10sp"
                 android:layout_marginBottom="24dp"/>
 
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content"

@@ -48,13 +48,50 @@ class OtaActivity : AppCompatActivity() {
 
         btnBack.setOnClickListener { finish() }
 
-        // Flash default bundled firmware
+        // Flash default bundled firmware — only enabled when the
+        // active profile's board is one this specific binary was
+        // actually compiled/verified for, not just "any board this app
+        // can define a pin layout for." See
+        // Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS. Uses its own
+        // dedicated text view (tvDefaultBoardSupport), not the general
+        // tvInfo one, since tvInfo gets overwritten constantly by
+        // other transient status messages elsewhere in this screen —
+        // this note needs to stay visible.
         val btnDefault = findViewById<android.widget.Button>(R.id.btnFlashDefault)
+        val tvBoardSupport = findViewById<TextView>(R.id.tvDefaultBoardSupport)
+        val activeProfileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val activeBoard = com.espad32.controller.pinmapper.ProfileResolver.allProfiles(this)
+            .find { it.key == activeProfileKey }
+            ?.let { com.espad32.controller.pinmapper.Boards.byKey(it.boardKey) }
+        val supportedNames = com.espad32.controller.pinmapper.Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS
+            .map { com.espad32.controller.pinmapper.Boards.byKey(it).displayName }
+        if (activeBoard != null && !com.espad32.controller.pinmapper.Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS.contains(activeBoard.key)) {
+            btnDefault.isEnabled = false
+            btnDefault.alpha = 0.5f
+            tvBoardSupport.text = "Only available for: ${supportedNames.joinToString(", ")}. Your active " +
+                "device (\"${activeBoard.displayName}\") isn't one of them — flashing this binary onto " +
+                "different hardware could run incorrectly or not boot at all. Use \"Choose File\" below " +
+                "with firmware compiled for your specific board instead."
+        } else {
+            tvBoardSupport.text = "Compiled for: ${supportedNames.joinToString(", ")}."
+        }
+        val boardSupported = activeBoard == null ||
+            com.espad32.controller.pinmapper.Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS.contains(activeBoard.key)
         btnDefault.setOnClickListener { flashFromAssets() }
 
-        // Auto-flash default if launched from Settings OTA tab
+        // Auto-flash default if launched from Settings OTA tab — gated
+        // by the same board check as the button itself, not a bypass
+        // of it. If unsupported, surface the same explanation instead
+        // of silently flashing (or silently doing nothing with no
+        // feedback at all).
         if (intent.getBooleanExtra("flashDefault", false)) {
-            flashFromAssets()
+            if (boardSupported) {
+                flashFromAssets()
+            } else {
+                tvStatus.text = "Flash Default skipped — see note below."
+            }
         }
 
         btnPickFile.setOnClickListener {

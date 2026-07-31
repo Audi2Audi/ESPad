@@ -633,7 +633,35 @@ class SettingsDialogFragment : DialogFragment() {
         addDivider()
         addSectionHeader("RESTORE DEFAULT FIRMWARE")
         addHint("Flashes the bundled default sketch. Use this to restore factory firmware.")
+
+        // Board-aware, matching OtaActivity's identical check — the
+        // bundled binary was only compiled/verified for specific
+        // board(s), not every board this app can define a pin layout
+        // for. See Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS.
+        val activeProfileKeyForOta = com.espad32.controller.controls.ActiveProfile.get(
+            requireContext(), com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val activeBoardForOta = com.espad32.controller.pinmapper.ProfileResolver.allProfiles(requireContext())
+            .find { it.key == activeProfileKeyForOta }
+            ?.let { com.espad32.controller.pinmapper.Boards.byKey(it.boardKey) }
+        val supportedNamesForOta = com.espad32.controller.pinmapper.Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS
+            .map { com.espad32.controller.pinmapper.Boards.byKey(it).displayName }
+        val boardSupportedForOta = activeBoardForOta == null ||
+            com.espad32.controller.pinmapper.Boards.DEFAULT_FIRMWARE_SUPPORTED_BOARDS.contains(activeBoardForOta.key)
+        if (!boardSupportedForOta) {
+            addHint(
+                "Only available for: ${supportedNamesForOta.joinToString(", ")}. Your active device " +
+                "(\"${activeBoardForOta?.displayName}\") isn't one of them — flashing this binary onto " +
+                "different hardware could run incorrectly or not boot at all."
+            )
+        } else {
+            addHint("Compiled for: ${supportedNamesForOta.joinToString(", ")}.")
+        }
         val btnDefault = addButton("⭐  Flash Default Firmware")
+        if (!boardSupportedForOta) {
+            btnDefault.isEnabled = false
+            btnDefault.alpha = 0.5f
+        }
 
         // Shared flash logic
         fun doFlash(bytes: ByteArray) {
