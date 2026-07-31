@@ -102,16 +102,30 @@ originally written, now corrected above for motors/servos):**
       - **Joysticks**: the long-press detection lives directly inside
         `JoystickView`'s own touch handling (it already owns its full
         touch event stream, no child-view conflicts to arbitrate).
-      - **Gamepad buttons**: same pattern, but applied per-button
-        (`place()`'s existing touch listeners) rather than at the
-        cluster level, since the cluster is built from several
-        separate `Button` views, not one custom View. Long-press on
-        ANY button relocates the WHOLE cluster container together, not
-        just that one button. **Real correctness fix needed here**:
-        a button's press already fires immediately on `ACTION_DOWN`
-        (unchanged) — entering relocate mode now explicitly RELEASES
-        that press right away, rather than leaving whatever it's
-        mapped to stuck "on" for the entire drag.
+      - **Gamepad buttons — refined after initial feedback.** First
+        version relocated the WHOLE cluster together on any long-press.
+        Per direct follow-up feedback, split this: **A/B/X/Y (the
+        diamond) still move together as one group** — now via their own
+        `diamondGroup` sub-`FrameLayout` (positioned within the outer
+        `clusterFrame` at the same default spot as before — visually
+        unchanged), sharing that sub-container as a common drag target.
+        **L1/L2/R1/R2 and Select/L3/R3/Start are each now independently
+        draggable** — same long-press-without-movement pattern, but
+        `dragTarget` is the button itself rather than any shared
+        container. Utility row buttons (Select/L3/R3/Start) previously
+        had no drag capability at all (plain press/release only) — now
+        get the identical treatment as everything else. 9 separate
+        persisted offsets now (diamond + 4 shoulders + 4 utility) rather
+        than 1. Default visual layout is completely unchanged — same
+        positions, same geometry — only what moves together vs.
+        independently changed. `resetCustomLayout()` updated to
+        re-render the whole cluster after clearing prefs rather than
+        manually tracking and zeroing 9 individual view references.
+        **Real correctness fix carried through to every one of these**:
+        a button's press fires immediately on `ACTION_DOWN` (unchanged,
+        no added lag); entering relocate mode explicitly RELEASES that
+        press right away, rather than leaving whatever it's mapped to
+        stuck "on" for the entire drag.
       - **A real coordinate-space bug caught and fixed before
         shipping**: the relocate-drag delta must use raw (screen-
         absolute) coordinates, not a view's own local coordinates —
