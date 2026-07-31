@@ -830,6 +830,22 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // (unaffected by translationX/Y, which is a purely visual offset
     // applied after layout), so this computes the valid offset range
     // that keeps those bounds within the parent's bounds.
+    // Disables clipChildren on every ViewGroup ancestor from `view` up
+    // to the true root — needed so a button translated far outside its
+    // small immediate parent's bounds (clusterFrame/diamondGroup/
+    // utilityRow, all sized just to fit their DEFAULT positions, not
+    // the whole screen) still actually renders, rather than getting cut
+    // off right at that parent's edge. Every level of the hierarchy
+    // clips independently by default, so this has to walk all the way
+    // up, not just disable it on one or two containers built here.
+    private fun disableClipChildrenUpToRoot(view: android.view.View) {
+        var current: android.view.View? = view
+        while (current is android.view.ViewGroup) {
+            current.clipChildren = false
+            current = current.parent as? android.view.View
+        }
+    }
+
     private fun clampOffset(view: android.view.View, dx: Float, dy: Float): Pair<Float, Float> {
         // Walks all the way up to the true root, accumulating each
         // intermediate ancestor's own layout position — needed because
@@ -953,6 +969,21 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val container = findViewById<LinearLayout>(R.id.virtualButtonsContainer) ?: return
         container.removeAllViews()
         container.orientation = LinearLayout.VERTICAL
+        // ViewGroups clip their children's drawing to their own bounds
+        // by default — fine normally, but this container (and its own
+        // sub-containers below) are small boxes just sized to fit
+        // their DEFAULT button positions. Once a button is dragged
+        // (via translationX/Y) somewhere outside that small box, the
+        // pixels beyond the box's edge get cut off even though the
+        // button's LOGICAL position is correctly clamped to the whole
+        // screen — confirmed directly from a screenshot showing
+        // buttons visually truncated right at their old container's
+        // edge. Disabled on every ancestor up to the true root (not
+        // just the containers built here), since virtualButtonsContainer
+        // itself is wrap_content-sized in the XML — its OWN parent
+        // would clip a deeply-dragged button too, once it exceeds even
+        // this container's bounds.
+        disableClipChildrenUpToRoot(container)
         container.gravity = Gravity.CENTER_HORIZONTAL
         // No longer applies a saved offset to `container` itself — per
         // direct feedback, "drag the whole cluster together" is gone,
@@ -977,6 +1008,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         val clusterFrame = android.widget.FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(clusterWidth), dp(clusterHeight))
+            clipChildren = false
         }
 
         // Diamond sub-container — Y/X/B/A live inside THIS, not directly
@@ -992,6 +1024,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 leftMargin = dp(cx - diamondWidth / 2)
                 topMargin = dp(cy - diamondHeight / 2)
             }
+            clipChildren = false
         }
         applySavedLayoutOffset(diamondGroup, "layout_gamepad_diamond")
         clusterFrame.addView(diamondGroup)
@@ -1193,6 +1226,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val utilityRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_HORIZONTAL
+            clipChildren = false
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(10) }
