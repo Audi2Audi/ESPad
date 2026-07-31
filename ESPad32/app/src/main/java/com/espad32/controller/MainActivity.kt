@@ -881,9 +881,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE).edit().clear().apply()
         joystickLeft.translationX = 0f; joystickLeft.translationY = 0f
         joystickRight.translationX = 0f; joystickRight.translationY = 0f
-        findViewById<android.view.View>(R.id.virtualButtonsContainer)?.let {
-            it.translationX = 0f; it.translationY = 0f
-        }
+        // The gamepad cluster now has many independently-positioned
+        // widgets (the diamond group + 4 shoulders + 4 utility buttons)
+        // rather than one — re-rendering it from scratch after clearing
+        // prefs is simpler and more robust than individually tracking
+        // and zeroing every one of those view references here.
+        if (virtualButtonsEnabled) renderVirtualButtons()
         CarLogger.log("Main", "Custom layout reset to defaults.")
     }
 
@@ -929,7 +932,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         container.removeAllViews()
         container.orientation = LinearLayout.VERTICAL
         container.gravity = Gravity.CENTER_HORIZONTAL
-        applySavedLayoutOffset(container, "layout_gamepad_cluster")
+        // No longer applies a saved offset to `container` itself — per
+        // direct feedback, "drag the whole cluster together" is gone,
+        // replaced by the more granular behavior below: the diamond
+        // (Y/X/B/A) stays a group that moves together via its own
+        // sub-container, everything else (shoulders, utility row) is
+        // independently draggable, each with its own saved position.
 
         val faceSize = 52
         val faceRadius = faceSize / 2
@@ -945,12 +953,40 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val cx = clusterWidth / 2
         val cy = clusterHeight / 2
 
-        val cluster = android.widget.FrameLayout(this).apply {
+        val clusterFrame = android.widget.FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(clusterWidth), dp(clusterHeight))
         }
 
-        fun place(keyCode: Int, sizeDp: Int, textSizeSp: Float, centerX: Int, centerY: Int) {
-            val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
+        // Diamond sub-container — Y/X/B/A live inside THIS, not directly
+        // in clusterFrame, specifically so they can share one drag
+        // target and move together as a group while everything else
+        // (placed directly in clusterFrame below) is independent.
+        val diamondWidth = 2 * hStep + faceSize
+        val diamondHeight = 2 * vStep + faceSize
+        val dcx = diamondWidth / 2
+        val dcy = diamondHeight / 2
+        val diamondGroup = android.widget.FrameLayout(this).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(dp(diamondWidth), dp(diamondHeight)).apply {
+                leftMargin = dp(cx - diamondWidth / 2)
+                topMargin = dp(cy - diamondHeight / 2)
+            }
+        }
+        applySavedLayoutOffset(diamondGroup, "layout_gamepad_diamond")
+        clusterFrame.addView(diamondGroup)
+
+        // A single, reusable button-builder — dragTarget decides what
+        // actually moves during THIS button's long-press-drag: the
+        // shared diamondGroup for Y/X/B/A (so they move as one unit),
+        // or the button itself for everything else (independent).
+        // Same long-press-without-movement pattern as before: normal
+        // press fires immediately on ACTION_DOWN (unchanged, no added
+        // lag), and if a hold-without-movement later triggers relocate
+        // mode, that press gets explicitly released right away rather
+        // than left stuck "on" for the whole drag.
+        fun place(
+            keyCode: Int, sizeDp: Int, textSizeSp: Float, centerX: Int, centerY: Int,
+            parent: android.view.ViewGroup, dragTarget: android.view.View, prefsKey: String
+        ) {
             val circle = Button(this).apply {
                 text = shortLabelForKeyCode(keyCode)
                 textSize = textSizeSp
@@ -967,19 +1003,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 }
             }
 
-            // Long-press-without-movement relocates the WHOLE cluster
-            // (not just this one button) — same pattern as
-            // JoystickView's own relocate detection, applied here since
-            // this cluster is built from several separate Button views
-            // rather than one custom View that already owns its touch
-            // handling. The button's normal press already fires
-            // immediately on ACTION_DOWN (matching existing behavior,
-            // no added lag); if relocate mode triggers, that press gets
-            // explicitly released right away rather than left hanging —
-            // otherwise whatever this button is mapped to could get
-            // stuck "on" for the whole drag.
             var relocateMode = false
-            var downX = 0f; var downY = 0f
+            var downRawX = 0f; var downRawY = 0f
             var baseX = 0f; var baseY = 0f
             val stationaryThresholdPx = 12f * resources.displayMetrics.density
             val longPressRunnable = Runnable {
@@ -989,8 +1014,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     circle.alpha = 0.9f
                     circle.setBackgroundResource(R.drawable.virtual_button_circle)
                     circle.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                    baseX = container.translationX
-                    baseY = container.translationY
+                    baseX = dragTarget.translationX
+                    baseY = dragTarget.translationY
                     CarLogger.log("Main", "Hold and drag to reposition — release to save.")
                 }
             }
@@ -998,7 +1023,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             circle.setOnTouchListener { v, event ->
                 when (event.action) {
                     android.view.MotionEvent.ACTION_DOWN -> {
-                        downX = event.rawX; downY = event.rawY
+                        downRawX = event.rawX; downRawY = event.rawY
                         relocateMode = false
                         v.postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
                         handleGamepadButtonEvent(keyCode, true)
@@ -1008,11 +1033,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     }
                     android.view.MotionEvent.ACTION_MOVE -> {
                         if (relocateMode) {
-                            val (clampedX, clampedY) = clampOffset(container, baseX + (event.rawX - downX), baseY + (event.rawY - downY))
-                            container.translationX = clampedX
-                            container.translationY = clampedY
+                            val (clampedX, clampedY) = clampOffset(dragTarget, baseX + (event.rawX - downRawX), baseY + (event.rawY - downRawY))
+                            dragTarget.translationX = clampedX
+                            dragTarget.translationY = clampedY
                         } else {
-                            val dx = event.rawX - downX; val dy = event.rawY - downY
+                            val dx = event.rawX - downRawX; val dy = event.rawY - downRawY
                             if (kotlin.math.sqrt(dx * dx + dy * dy) > stationaryThresholdPx) {
                                 v.removeCallbacks(longPressRunnable) // real movement — not a hold, cancel relocate detection
                             }
@@ -1022,7 +1047,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                         v.removeCallbacks(longPressRunnable)
                         if (relocateMode) {
-                            saveLayoutOffset("layout_gamepad_cluster", container.translationX, container.translationY)
+                            saveLayoutOffset(prefsKey, dragTarget.translationX, dragTarget.translationY)
                             CarLogger.log("Main", "Position saved.")
                         } else {
                             handleGamepadButtonEvent(keyCode, false)
@@ -1034,29 +1059,115 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     else -> false
                 }
             }
-            cluster.addView(circle)
+            parent.addView(circle)
         }
 
-        // Diamond — Y top, X left, B right, A bottom.
-        place(KeyEvent.KEYCODE_BUTTON_Y, faceSize, 13f, cx, cy - vStep)
-        place(KeyEvent.KEYCODE_BUTTON_X, faceSize, 13f, cx - hStep, cy)
-        place(KeyEvent.KEYCODE_BUTTON_B, faceSize, 13f, cx + hStep, cy)
-        place(KeyEvent.KEYCODE_BUTTON_A, faceSize, 13f, cx, cy + vStep)
+        // Diamond — Y top, X left, B right, A bottom, positioned within
+        // diamondGroup (its own local origin), all four sharing
+        // diamondGroup as their drag target so they move as one unit.
+        place(KeyEvent.KEYCODE_BUTTON_Y, faceSize, 13f, dcx, dcy - vStep, diamondGroup, diamondGroup, "layout_gamepad_diamond")
+        place(KeyEvent.KEYCODE_BUTTON_X, faceSize, 13f, dcx - hStep, dcy, diamondGroup, diamondGroup, "layout_gamepad_diamond")
+        place(KeyEvent.KEYCODE_BUTTON_B, faceSize, 13f, dcx + hStep, dcy, diamondGroup, diamondGroup, "layout_gamepad_diamond")
+        place(KeyEvent.KEYCODE_BUTTON_A, faceSize, 13f, dcx, dcy + vStep, diamondGroup, diamondGroup, "layout_gamepad_diamond")
 
-        // Shoulders — tight against the diamond, bracketing the X/B
-        // row height (not spanning the diamond's full height).
-        place(KeyEvent.KEYCODE_BUTTON_L1, shoulderSize, 11f, cx - hStep - shoulderHOffset, cy - shoulderVOffset)
-        place(KeyEvent.KEYCODE_BUTTON_L2, shoulderSize, 11f, cx - hStep - shoulderHOffset, cy + shoulderVOffset)
-        place(KeyEvent.KEYCODE_BUTTON_R1, shoulderSize, 11f, cx + hStep + shoulderHOffset, cy - shoulderVOffset)
-        place(KeyEvent.KEYCODE_BUTTON_R2, shoulderSize, 11f, cx + hStep + shoulderHOffset, cy + shoulderVOffset)
+        // Shoulders — tight against the diamond by default, bracketing
+        // the X/B row height — but each independently draggable now
+        // (dragTarget = the button itself, not the diamond or a shared
+        // container), positioned directly in clusterFrame rather than
+        // inside diamondGroup.
+        fun placeIndependent(keyCode: Int, sizeDp: Int, textSizeSp: Float, centerX: Int, centerY: Int, parent: android.view.ViewGroup, prefsKey: String) {
+            lateinit var selfRef: android.widget.Button
+            // place() needs the button as its own dragTarget, but that
+            // button doesn't exist until place() creates it — solved by
+            // building it directly here instead of via place(), reusing
+            // the identical logic with dragTarget = the view itself.
+            val circle = Button(this).apply {
+                text = shortLabelForKeyCode(keyCode)
+                textSize = textSizeSp
+                isAllCaps = false
+                minWidth = 0; minimumWidth = 0
+                minHeight = 0; minimumHeight = 0
+                setPadding(0, 0, 0, 0)
+                setBackgroundResource(R.drawable.virtual_button_circle)
+                setTextColor(Color.parseColor("#E7EBEE"))
+                alpha = 0.9f
+                layoutParams = android.widget.FrameLayout.LayoutParams(dp(sizeDp), dp(sizeDp)).apply {
+                    leftMargin = dp(centerX - sizeDp / 2)
+                    topMargin = dp(centerY - sizeDp / 2)
+                }
+            }
+            selfRef = circle
+            applySavedLayoutOffset(circle, prefsKey)
 
-        container.addView(cluster)
+            var relocateMode = false
+            var downRawX = 0f; var downRawY = 0f
+            var baseX = 0f; var baseY = 0f
+            val stationaryThresholdPx = 12f * resources.displayMetrics.density
+            val longPressRunnable = Runnable {
+                if (!relocateMode) {
+                    relocateMode = true
+                    handleGamepadButtonEvent(keyCode, false)
+                    circle.alpha = 0.9f
+                    circle.setBackgroundResource(R.drawable.virtual_button_circle)
+                    circle.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    baseX = selfRef.translationX
+                    baseY = selfRef.translationY
+                    CarLogger.log("Main", "Hold and drag to reposition — release to save.")
+                }
+            }
+            circle.setOnTouchListener { v, event ->
+                when (event.action) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        downRawX = event.rawX; downRawY = event.rawY
+                        relocateMode = false
+                        v.postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
+                        handleGamepadButtonEvent(keyCode, true)
+                        v.alpha = 1f
+                        v.setBackgroundResource(R.drawable.virtual_button_circle_pressed)
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        if (relocateMode) {
+                            val (clampedX, clampedY) = clampOffset(selfRef, baseX + (event.rawX - downRawX), baseY + (event.rawY - downRawY))
+                            selfRef.translationX = clampedX
+                            selfRef.translationY = clampedY
+                        } else {
+                            val dx = event.rawX - downRawX; val dy = event.rawY - downRawY
+                            if (kotlin.math.sqrt(dx * dx + dy * dy) > stationaryThresholdPx) {
+                                v.removeCallbacks(longPressRunnable)
+                            }
+                        }
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        v.removeCallbacks(longPressRunnable)
+                        if (relocateMode) {
+                            saveLayoutOffset(prefsKey, selfRef.translationX, selfRef.translationY)
+                            CarLogger.log("Main", "Position saved.")
+                        } else {
+                            handleGamepadButtonEvent(keyCode, false)
+                            v.alpha = 0.9f
+                            v.setBackgroundResource(R.drawable.virtual_button_circle)
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+            parent.addView(circle)
+        }
 
-        // Select/L3/R3/Start — not part of the main cluster at all in
-        // the reference (its equivalents are separate small toolbar
-        // icons elsewhere on screen), so kept out of the diamond here
-        // too rather than adding a row that would make the cluster
-        // taller again. Small, secondary, directly below instead.
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_L1, shoulderSize, 11f, cx - hStep - shoulderHOffset, cy - shoulderVOffset, clusterFrame, "layout_gamepad_l1")
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_L2, shoulderSize, 11f, cx - hStep - shoulderHOffset, cy + shoulderVOffset, clusterFrame, "layout_gamepad_l2")
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_R1, shoulderSize, 11f, cx + hStep + shoulderHOffset, cy - shoulderVOffset, clusterFrame, "layout_gamepad_r1")
+        placeIndependent(KeyEvent.KEYCODE_BUTTON_R2, shoulderSize, 11f, cx + hStep + shoulderHOffset, cy + shoulderVOffset, clusterFrame, "layout_gamepad_r2")
+
+        container.addView(clusterFrame)
+
+        // Select/L3/R3/Start — same independent-dragging treatment,
+        // still visually a small row below the diamond by default, but
+        // each one now separately repositionable rather than fixed in
+        // that row (or, previously, sharing the whole-cluster drag).
         val utilityRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -1064,13 +1175,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(10) }
         }
-        listOf(
-            KeyEvent.KEYCODE_BUTTON_SELECT,
-            KeyEvent.KEYCODE_BUTTON_THUMBL,
-            KeyEvent.KEYCODE_BUTTON_THUMBR,
-            KeyEvent.KEYCODE_BUTTON_START
-        ).forEach { kc ->
-            val mapping = ControllerMapping.buttons.find { it.keyCode == kc }
+        val utilityKeys = mapOf(
+            KeyEvent.KEYCODE_BUTTON_SELECT to "layout_gamepad_select",
+            KeyEvent.KEYCODE_BUTTON_THUMBL to "layout_gamepad_l3",
+            KeyEvent.KEYCODE_BUTTON_THUMBR to "layout_gamepad_r3",
+            KeyEvent.KEYCODE_BUTTON_START to "layout_gamepad_start"
+        )
+        utilityKeys.forEach { (kc, prefsKey) ->
+            lateinit var selfRef: android.widget.Button
             val b = Button(this).apply {
                 text = shortLabelForKeyCode(kc)
                 textSize = 8f
@@ -1083,10 +1195,58 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 alpha = 0.8f
                 layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(6) }
             }
+            selfRef = b
+            applySavedLayoutOffset(b, prefsKey)
+
+            var relocateMode = false
+            var downRawX = 0f; var downRawY = 0f
+            var baseX = 0f; var baseY = 0f
+            val stationaryThresholdPx = 12f * resources.displayMetrics.density
+            val longPressRunnable = Runnable {
+                if (!relocateMode) {
+                    relocateMode = true
+                    handleGamepadButtonEvent(kc, false)
+                    b.alpha = 0.8f
+                    b.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    baseX = selfRef.translationX
+                    baseY = selfRef.translationY
+                    CarLogger.log("Main", "Hold and drag to reposition — release to save.")
+                }
+            }
             b.setOnTouchListener { v, event ->
                 when (event.action) {
-                    android.view.MotionEvent.ACTION_DOWN -> { handleGamepadButtonEvent(kc, true); v.alpha = 1f; true }
-                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> { handleGamepadButtonEvent(kc, false); v.alpha = 0.8f; true }
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        downRawX = event.rawX; downRawY = event.rawY
+                        relocateMode = false
+                        v.postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
+                        handleGamepadButtonEvent(kc, true)
+                        v.alpha = 1f
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        if (relocateMode) {
+                            val (clampedX, clampedY) = clampOffset(selfRef, baseX + (event.rawX - downRawX), baseY + (event.rawY - downRawY))
+                            selfRef.translationX = clampedX
+                            selfRef.translationY = clampedY
+                        } else {
+                            val dx = event.rawX - downRawX; val dy = event.rawY - downRawY
+                            if (kotlin.math.sqrt(dx * dx + dy * dy) > stationaryThresholdPx) {
+                                v.removeCallbacks(longPressRunnable)
+                            }
+                        }
+                        true
+                    }
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                        v.removeCallbacks(longPressRunnable)
+                        if (relocateMode) {
+                            saveLayoutOffset(prefsKey, selfRef.translationX, selfRef.translationY)
+                            CarLogger.log("Main", "Position saved.")
+                        } else {
+                            handleGamepadButtonEvent(kc, false)
+                            v.alpha = 0.8f
+                        }
+                        true
+                    }
                     else -> false
                 }
             }
