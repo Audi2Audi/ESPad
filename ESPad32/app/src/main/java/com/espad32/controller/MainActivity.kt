@@ -815,9 +815,37 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // nudged it by this much" adjustment on top.
     private val LAYOUT_PREFS_NAME = "espad_layout_prefs"
 
+    // Baseline default positions — a hands-on layout arranged and
+    // exported (via "Export Current Layout" in Settings) rather than
+    // the bare anchor-math positions. Values in dp (the export reads
+    // out dp too, for exactly this reason — resolution-independent,
+    // matching every other measurement in renderVirtualButtons()).
+    // Used as the FALLBACK in loadLayoutOffset() below, not applied
+    // unconditionally — anyone who drags something further still
+    // overrides this via the normal save mechanism, and "Reset Layout
+    // to Defaults" now correctly means "back to this," not "back to
+    // (0,0)."
+    private val DEFAULT_LAYOUT_OFFSETS_DP = mapOf(
+        "layout_joystick_left" to Pair(-17f, -59f),
+        "layout_joystick_right" to Pair(15f, -53f),
+        "layout_gamepad_diamond" to Pair(143f, -28f),
+        "layout_gamepad_l1" to Pair(-134f, -111f),
+        "layout_gamepad_l2" to Pair(-167f, -89f),
+        "layout_gamepad_r1" to Pair(223f, -108f),
+        "layout_gamepad_r2" to Pair(204f, -88f),
+        "layout_gamepad_select" to Pair(6f, -104f),
+        "layout_gamepad_l3" to Pair(-335f, -143f),
+        "layout_gamepad_r3" to Pair(240f, -141f),
+        "layout_gamepad_start" to Pair(-8f, -103f)
+    )
+
     private fun loadLayoutOffset(key: String): Pair<Float, Float> {
         val prefs = getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE)
-        return Pair(prefs.getFloat("${key}_x", 0f), prefs.getFloat("${key}_y", 0f))
+        val defaultDp = DEFAULT_LAYOUT_OFFSETS_DP[key] ?: Pair(0f, 0f)
+        val density = resources.displayMetrics.density
+        val defaultXPx = defaultDp.first * density
+        val defaultYPx = defaultDp.second * density
+        return Pair(prefs.getFloat("${key}_x", defaultXPx), prefs.getFloat("${key}_y", defaultYPx))
     }
 
     private fun saveLayoutOffset(key: String, x: Float, y: Float) {
@@ -910,8 +938,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     // different screen size). Called from Settings.
     fun resetCustomLayout() {
         getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE).edit().clear().apply()
-        joystickLeft.translationX = 0f; joystickLeft.translationY = 0f
-        joystickRight.translationX = 0f; joystickRight.translationY = 0f
+        // Was joystickLeft/Right.translationX/Y = 0f directly — wrong
+        // now that the fallback (see loadLayoutOffset/
+        // DEFAULT_LAYOUT_OFFSETS_DP above) isn't (0,0) anymore. Re-apply
+        // via applySavedLayoutOffset so it correctly picks up whatever
+        // the current baseline default actually is.
+        applySavedLayoutOffset(joystickLeft, "layout_joystick_left")
+        applySavedLayoutOffset(joystickRight, "layout_joystick_right")
         // The gamepad cluster now has many independently-positioned
         // widgets (the diamond group + 4 shoulders + 4 utility buttons)
         // rather than one — re-rendering it from scratch after clearing
