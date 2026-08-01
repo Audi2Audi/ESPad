@@ -84,6 +84,29 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **New ESePAD logo added to the device-hosted web UI** (v20
+      firmware, delivered as a zip). Direct follow-up to the app icon/
+      placeholder logo update — the web UI is a completely separate
+      thing (HTML/CSS/JS served directly by the ESP32 itself), so it
+      needed its own copy of the artwork embedded in firmware, not
+      something that could just inherit from the Android app's
+      resources. Resized from the original 500x500 source down to
+      120x120 (a reasonable balance between staying legible and
+      keeping the embedded size small — roughly 22KB raw, ~29KB once
+      base64-encoded for inline `<img>` use) and embedded directly
+      inline within the existing HTML raw string literal — no new C++
+      variable or string concatenation needed, since a raw string
+      literal can contain arbitrary characters (including a full
+      base64 blob) as long as it never contains the exact closing
+      delimiter sequence, which base64's own alphabet can't produce.
+      **Text label deliberately left as "ESPad Device Setup"** — same
+      reasoning as the app icon update: the logo graphic was asked for
+      directly, the full text/branding rename to "ESePAD" is separate,
+      deliberate future work (see the "Pending rename" entry further
+      down this doc), not something to fold in as a side effect.
+
+
+
 - [x] **Real motor shield discovery, then real I2C driver support built
       for it** (v19 firmware, delivered as a zip). Started as "walk
       through wiring a test LED to the Train's motor driver" — a
