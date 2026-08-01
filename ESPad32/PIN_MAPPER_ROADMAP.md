@@ -84,6 +84,49 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **New default on-screen layout, set from an actual hands-on
+      arrangement rather than the original anchor-math positions**
+      (app-only, no firmware). Direct follow-up to the customizable-
+      layout feature — once a layout was actually arranged by dragging
+      everything into place, the natural next step was making THAT the
+      new baseline rather than the bare computed default.
+      - **Precision mattered here, so avoided estimating from a
+        screenshot** — reading exact pixel positions off an image
+        risks real transcription error. Instead, added "Export Current
+        Layout" (Settings' Theme tab) — reads every saved offset in dp
+        (resolution-independent, matching every other measurement in
+        `renderVirtualButtons()`) and logs it via `CarLogger`, which
+        already had a working "Share Log" button (`LogViewerActivity`)
+        — no new export/share mechanism needed at all, just something
+        worth actually logging. The resulting log file was shared
+        directly as a text attachment and read exactly, not
+        transcribed from an image.
+      - **The actual fix is a one-line-of-thinking change with real
+        leverage**: instead of hardcoding the new positions into every
+        individual margin calculation in `renderVirtualButtons()`,
+        changed what `loadLayoutOffset()` uses as its FALLBACK — from
+        a blanket `(0,0)` to a new `DEFAULT_LAYOUT_OFFSETS_DP` map
+        containing the exported values. Since an actual saved
+        preference always takes precedence over a fallback, this
+        changes the STARTING point without touching how customization
+        or persistence work at all — anyone who drags something
+        further still overrides this baseline exactly as before.
+      - **Real correctness fix needed alongside this**: `resetCustomLayout()`
+        previously hardcoded the joysticks back to `translationX/Y =
+        0f` directly after clearing prefs — correct when the fallback
+        genuinely WAS `(0,0)`, but wrong now that it isn't. Fixed to
+        call `applySavedLayoutOffset()` again instead, so "Reset Layout
+        to Defaults" correctly means "back to this new baseline," not
+        "back to zero."
+      - Double-checked all 11 prefs keys (2 joysticks + diamond + 4
+        shoulders + 4 utility buttons) are spelled identically
+        everywhere they appear — the new default map, the export
+        function, and every place a saved offset actually gets applied
+        — since a single typo would have silently fallen back to
+        `(0,0)` for just that one element without any error.
+
+
+
 - [x] **Customizable on-screen layout — hold and drag to reposition
       joysticks and the gamepad button cluster anywhere on screen**
       (app-only, no firmware involved). Persisted per-widget in
