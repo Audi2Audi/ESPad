@@ -84,6 +84,47 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Bidirectional Drive axis function — one input controls forward/
+      reverse direction AND speed together** (app-only, no firmware).
+      Requested as "drive with D-pad up/down, or alternatively left
+      stick up/down" — checked the actual mapping architecture before
+      promising anything, since this looked like it might hit the same
+      gap already logged elsewhere in this doc (differential-drive/
+      dual-axis mapping not yet built): confirmed `CUSTOM_PWM` only
+      ever sends one scalar to one PWM slider, with no concept of a
+      paired direction role that should flip based on which side of
+      center an axis is on — and `DRIVE`/`TRIGGER_DRIVE` (which sound
+      like they'd already do this) are legacy Freenove-era functions
+      sending `CMD_MOTOR`, which this firmware has never understood.
+      - **New `AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE`**, configured
+        via a 3-step picker in `ControllerMappingActivity` (forward
+        toggle → reverse toggle → speed slider), chaining the same
+        single-target picker pattern `CUSTOM_PWM` already uses, just
+        extended to 3 sequential picks instead of 1.
+      - **New `executeCustomBidirectionalDrive()`** resolves all three
+        Controls buttons, computes direction (negative Y = forward,
+        positive = reverse, exactly zero = stopped — matching
+        Android's screen-coordinate convention for stick/axis values)
+        and speed magnitude from the raw axis value, and — the
+        important correctness detail — only sends direction `SET`
+        commands when direction actually CHANGES, not on every axis-
+        move frame the way speed naturally needs to be. Debounced the
+        same way `CUSTOM_PWM` already is.
+      - **One capability serves both halves of the original request**,
+        not two separate features: D-Pad input can already be read as
+        a continuous axis (`AXIS_HAT_X`/`AXIS_HAT_Y`, already listed
+        in `ALL_AXES`) rather than only discrete button presses — so
+        this same function is assignable to either the D-Pad axis
+        mapping or the Left Stick mapping, whichever the person
+        prefers.
+      **Not yet tested against real hardware** — same honest caveat as
+      everything else built this session. Good first thing to verify
+      once the car's actually wired: push the stick/D-pad up, confirm
+      the motor spins one way at a speed that scales with how far it's
+      pushed; push down, confirm it reverses; center, confirm it stops.
+
+
+
 - [x] **New default on-screen layout, set from an actual hands-on
       arrangement rather than the original anchor-math positions**
       (app-only, no firmware). Direct follow-up to the customizable-
@@ -1732,11 +1773,17 @@ entry above.
       exact same `DeviceCommand.sendSet()` path the on-screen tap uses,
       so behavior (and the device log) is identical either way.
       **Axes/sticks were "not done" when this was written — since
-      resolved:** see the `CUSTOM_PWM` axis-mapping entry elsewhere in
-      this doc (gamepad axis → a Controls PWM slider). Buttons and
-      single-axis PWM both work now; only a true differential-drive/
-      dual-servo axis mapping remains undone, since neither has a
-      generic firmware equivalent yet.
+      resolved, in two stages:** see the `CUSTOM_PWM` axis-mapping
+      entry (gamepad axis → a Controls PWM slider) and the
+      `CUSTOM_BIDIRECTIONAL_DRIVE` entry further down this doc (one
+      axis → forward/reverse direction + speed together, for a single
+      motor). Buttons, single-axis PWM, and single-motor bidirectional
+      drive all work now; only TRUE differential-drive (two motors
+      independently mixed from one stick, for actual left/right
+      steering) remains undone — a genuinely different, larger
+      problem than bidirectional drive solves, since it needs mixing
+      logic across two separate speed roles at once, not just a
+      direction flip on one.
 - [x] **PWM functions wired end-to-end in the app** — Pin Mapper's
       "Add Function" now has a real type picker (On/Off vs. PWM 0-255),
       not hardcoded to digital-only. Controls' "Add Button" adapts its
