@@ -203,13 +203,23 @@ class ControllerMappingActivity : AppCompatActivity() {
     }
 
     private fun displayLabelForAxis(mapping: AxisMapping): String {
-        if (mapping.function != AxisFunction.CUSTOM_PWM) return mapping.function.label
         val profileKey = com.espad32.controller.controls.ActiveProfile.get(
             this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
         )
         val buttons = com.espad32.controller.controls.ControlButtonStorage(this).loadButtons(profileKey)
-        val target = buttons.find { it.id == mapping.customButtonId }
-        return if (target != null) "→ ${target.label}" else "Custom PWM Function (none set)"
+        if (mapping.function == AxisFunction.CUSTOM_PWM) {
+            val target = buttons.find { it.id == mapping.customButtonId }
+            return if (target != null) "→ ${target.label}" else "Custom PWM Function (none set)"
+        }
+        if (mapping.function == AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE) {
+            val fwd = buttons.find { it.id == mapping.customForwardButtonId }
+            val rev = buttons.find { it.id == mapping.customReverseButtonId }
+            val spd = buttons.find { it.id == mapping.customButtonId }
+            return if (fwd != null && rev != null && spd != null)
+                "→ ${fwd.label}/${rev.label} + ${spd.label}"
+            else "Bidirectional Drive (not fully set)"
+        }
+        return mapping.function.label
     }
 
     private fun showAxisEditDialog(index: Int, mapping: AxisMapping) {
@@ -230,6 +240,8 @@ class ControllerMappingActivity : AppCompatActivity() {
                 val selected = functions[spinner.selectedItemPosition]
                 if (selected == AxisFunction.CUSTOM_PWM) {
                     showCustomPwmPicker(index, mapping)
+                } else if (selected == AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE) {
+                    showBidirectionalDrivePicker(index, mapping)
                 } else {
                     ControllerMapping.updateAxis(index, selected, this)
                     showTab(1)
@@ -265,6 +277,73 @@ class ControllerMappingActivity : AppCompatActivity() {
             .setItems(labels) { _, itemIndex ->
                 ControllerMapping.updateAxis(index, AxisFunction.CUSTOM_PWM, this, buttons[itemIndex].id)
                 showTab(1)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // Three-step picker for Bidirectional Drive — needs a forward
+    // direction toggle, a reverse direction toggle, and a speed slider,
+    // chained one after another rather than one combined dialog, so
+    // each step can filter to the right ControlType (TOGGLE for the
+    // two direction roles, SLIDER for speed) with a clear label for
+    // which one is currently being picked.
+    private fun showBidirectionalDrivePicker(index: Int, mapping: AxisMapping) {
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val allButtons = com.espad32.controller.controls.ControlButtonStorage(this).loadButtons(profileKey)
+        val toggleButtons = allButtons.filter { it.controlType == com.espad32.controller.controls.ControlType.TOGGLE }
+        val sliderButtons = allButtons.filter { it.controlType == com.espad32.controller.controls.ControlType.SLIDER }
+
+        if (toggleButtons.size < 2) {
+            android.widget.Toast.makeText(
+                this,
+                "Needs at least 2 Toggle-type Controls buttons (one per direction) — add them in Controls first.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        if (sliderButtons.isEmpty()) {
+            android.widget.Toast.makeText(
+                this,
+                "No PWM sliders exist yet for the active profile — add a PWM function's button in Controls first.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val toggleLabels = toggleButtons.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Step 1 of 3 — Forward direction toggle")
+            .setItems(toggleLabels) { _, fwdIndex ->
+                val forwardBtn = toggleButtons[fwdIndex]
+                AlertDialog.Builder(this)
+                    .setTitle("Step 2 of 3 — Reverse direction toggle")
+                    .setItems(toggleLabels) { _, revIndex ->
+                        val reverseBtn = toggleButtons[revIndex]
+                        if (reverseBtn.id == forwardBtn.id) {
+                            android.widget.Toast.makeText(this, "Forward and reverse need to be different buttons.", android.widget.Toast.LENGTH_LONG).show()
+                            return@setItems
+                        }
+                        val sliderLabels = sliderButtons.map { it.label }.toTypedArray()
+                        AlertDialog.Builder(this)
+                            .setTitle("Step 3 of 3 — Speed slider")
+                            .setItems(sliderLabels) { _, spdIndex ->
+                                val speedBtn = sliderButtons[spdIndex]
+                                ControllerMapping.updateAxis(
+                                    index, AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE, this,
+                                    customButtonId = speedBtn.id,
+                                    customForwardButtonId = forwardBtn.id,
+                                    customReverseButtonId = reverseBtn.id
+                                )
+                                showTab(1)
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
             }
             .setNegativeButton("Cancel", null)
             .show()

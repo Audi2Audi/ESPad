@@ -42,7 +42,16 @@ enum class AxisFunction(val label: String) {
     // role, e.g. "Motor speed") using a single axis — see
     // AxisMapping.customButtonId. Only axisX is used; axisY is ignored
     // for this function.
-    CUSTOM_PWM("Custom PWM Function")
+    CUSTOM_PWM("Custom PWM Function"),
+    // Drives a single-motor forward/reverse setup from ONE axis (a
+    // stick's Y, or the D-Pad read as an axis rather than discrete
+    // buttons) — above center triggers forward + proportional speed,
+    // below center triggers reverse + proportional speed, center
+    // stops. Needed because CUSTOM_PWM only ever sends one scalar to
+    // one PWM slider — it has no concept of a paired direction role
+    // that should flip based on which side of center the axis is on.
+    // See customForwardButtonId/customReverseButtonId below.
+    CUSTOM_BIDIRECTIONAL_DRIVE("Bidirectional Drive (fwd/rev + speed)")
 }
 
 // ── A single button mapping ───────────────────────────────────────────
@@ -63,9 +72,16 @@ data class AxisMapping(
     val function: AxisFunction,
     val invertX: Boolean = false,
     val invertY: Boolean = false,
-    // Only used when function == CUSTOM_PWM — the id of a
-    // ControlButtonDef (a SLIDER-type Controls button) this axis drives.
-    val customButtonId: String? = null
+    // Only used when function == CUSTOM_PWM (the speed slider it
+    // drives) or CUSTOM_BIDIRECTIONAL_DRIVE (also the speed slider,
+    // same meaning — the other two roles for that function are below).
+    val customButtonId: String? = null,
+    // Only used when function == CUSTOM_BIDIRECTIONAL_DRIVE — ids of
+    // TOGGLE-type Controls buttons (e.g. "Motor direction A"/"Motor
+    // direction B") that get set on/off based on which side of center
+    // the axis is on.
+    val customForwardButtonId: String? = null,
+    val customReverseButtonId: String? = null
 )
 
 // ── Preset profiles ───────────────────────────────────────────────────
@@ -223,8 +239,16 @@ object ControllerMapping {
         saveToPrefs(context)
     }
 
-    fun updateAxis(index: Int, function: AxisFunction, context: Context, customButtonId: String? = null) {
-        _axes[index] = _axes[index].copy(function = function, customButtonId = customButtonId)
+    fun updateAxis(
+        index: Int, function: AxisFunction, context: Context, customButtonId: String? = null,
+        customForwardButtonId: String? = null, customReverseButtonId: String? = null
+    ) {
+        _axes[index] = _axes[index].copy(
+            function = function,
+            customButtonId = customButtonId,
+            customForwardButtonId = customForwardButtonId,
+            customReverseButtonId = customReverseButtonId
+        )
         saveToPrefs(context)
     }
 

@@ -74,6 +74,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private val SERVO_SEND_INTERVAL_MS = 80L
     private var lastCustomPwmSendTime = 0L
     private var lastCustomPwmSentValue = -1
+    // For CUSTOM_BIDIRECTIONAL_DRIVE — tracks the last SENT speed value
+    // (debounced same as CUSTOM_PWM) and the last SENT direction state
+    // separately, since direction should only be re-sent when it
+    // actually changes (forward->reverse or either->stopped), not on
+    // every axis-move frame the way speed naturally is.
+    private var lastBidirDriveSendTime = 0L
+    private var lastBidirDriveSentSpeed = -1
+    private var lastBidirDriveDirection = 0 // -1 reverse, 0 stopped, 1 forward
 
     // ── Sensitivity (loaded from prefs) ───────────────────────────────
     private var g8ServoStep  = 8.0f
@@ -618,6 +626,20 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                             executeCustomPwmAxis(mapping.customButtonId, normalized)
                         }
                     }
+                    AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE -> {
+                        // Uses the VERTICAL (Y) axis specifically —
+                        // "up/down" is the whole point of this function,
+                        // unlike CUSTOM_PWM which is horizontal-only.
+                        // Android convention: pushed up typically
+                        // reports a NEGATIVE Y (screen-coordinate-style),
+                        // so negative = forward, positive = reverse.
+                        executeCustomBidirectionalDrive(
+                            mapping.customForwardButtonId,
+                            mapping.customReverseButtonId,
+                            mapping.customButtonId,
+                            y
+                        )
+                    }
                 }
             }
             return true
@@ -778,6 +800,70 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 CarLogger.log("Controls", response ?: "\"${btn.label}\": no response (check connection)")
             }
         }
+    }
+
+    // Drives a single-motor forward/reverse setup from one axis value.
+    // Resolves THREE Controls buttons (not one, unlike executeCustomPwmAxis
+    // above) — a forward toggle, a reverse toggle, and a speed slider —
+    // then sends direction SET commands only when direction actually
+    // changes (forward/reverse/stopped), and a speed SETV whenever the
+    // magnitude changes, debounced the same way CUSTOM_PWM is.
+    private fun executeCustomBidirectionalDrive(forwardButtonId: String?, reverseButtonId: String?, speedButtonId: String?, y: Float) {
+        if (forwardButtonId == null || reverseButtonId == null || speedButtonId == null) {
+            CarLogger.log("Controls", "Bidirectional Drive axis isn't fully configured yet (needs forward + reverse + speed).")
+            return
+        }
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val buttons = controlButtonStorage.loadButtons(profileKey)
+        val forwardBtn = buttons.find { it.id == forwardButtonId }
+        val reverseBtn = buttons.find { it.id == reverseButtonId }
+        val speedBtn = buttons.find { it.id == speedButtonId }
+        if (forwardBtn == null || reverseBtn == null || speedBtn == null) {
+            CarLogger.log("Controls", "One of the assigned Bidirectional Drive buttons no longer exists (was it deleted?).")
+            return
+        }
+
+        // Android convention: pushed up typically reports a negative Y
+        // (screen-coordinate-style) — negative = forward, positive =
+        // reverse, exactly zero = stopped (applyDeadzone already
+        // collapses anything within the deadzone to exactly 0f).
+        val direction = when {
+            y < 0f -> 1
+            y > 0f -> -1
+            else -> 0
+        }
+        val speed = (Math.abs(y) * 255f).toInt().coerceIn(0, 255)
+
+        val now = System.currentTimeMillis()
+        val speedChanged = speed != lastBidirDriveSentSpeed
+        val directionChanged = direction != lastBidirDriveDirection
+        if (!speedChanged && !directionChanged) return
+        if ((now - lastBidirDriveSendTime) < SERVO_SEND_INTERVAL_MS) return
+        lastBidirDriveSendTime = now
+
+        if (directionChanged) {
+            lastBidirDriveDirection = direction
+            val forwardOn = direction == 1
+            val reverseOn = direction == -1
+            controlButtonStorage.setState(profileKey, forwardBtn.id, forwardOn)
+            controlButtonStorage.setState(profileKey, reverseBtn.id, reverseOn)
+            com.espad32.controller.controls.DeviceCommand.sendSet(forwardBtn.roleKey, forwardOn) { response ->
+                CarLogger.log("Controls", response ?: "\"${forwardBtn.label}\": no response (check connection)")
+            }
+            com.espad32.controller.controls.DeviceCommand.sendSet(reverseBtn.roleKey, reverseOn) { response ->
+                CarLogger.log("Controls", response ?: "\"${reverseBtn.label}\": no response (check connection)")
+            }
+        }
+        if (speedChanged) {
+            lastBidirDriveSentSpeed = speed
+            controlButtonStorage.setValue(profileKey, speedBtn.id, speed)
+            com.espad32.controller.controls.DeviceCommand.sendSetValue(speedBtn.roleKey, speed) { response ->
+                CarLogger.log("Controls", response ?: "\"${speedBtn.label}\": no response (check connection)")
+            }
+        }
+        renderLiveButtons()
     }
 
     // ── Joysticks ─────────────────────────────────────────────────────
