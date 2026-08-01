@@ -8,36 +8,16 @@
     android:padding="8dp"
     android:paddingEnd="52dp">
 
-    <!-- Photo + Record + Log + Flip + Settings.
-         LED/Face/Horn/Servo Reset/Custom Face removed — those sent
-         CMD_LED_MOD / CMD_MATRIX_MOD / CMD_BUZZER / CMD_CAMERA commands
-         specific to the original Freenove-based car firmware, which
-         lives in a separate, untouched repo (ESPad32) and doesn't apply
-         to devices built for this project (train, custom RC car, etc).
-         Camera Flip is kept since it only flips the local video feed
-         orientation — no device command involved. -->
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button android:id="@+id/btnPhoto" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="📸" android:textSize="14sp"
-            android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnRecord" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="⏺" android:textSize="14sp"
-            android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnViewLog" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="📋" android:textSize="14sp"
-            android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnCameraFlip" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="🔄 Flip" android:textSize="11sp"
-            android:layout_marginEnd="4dp" style="@style/CarButton"/>
-        <Button android:id="@+id/btnSettings" android:layout_width="0dp"
-            android:layout_height="36dp" android:layout_weight="1"
-            android:text="⚙" android:textSize="14sp" style="@style/CarButton"/>
-    </LinearLayout>
+    <!-- Was a row of Photo/Record/View Log/Camera Flip/Settings icon
+         buttons here — removed as genuine duplication, not just
+         simplified for its own sake: Photo/Record/Settings already
+         exist as compact icons in cameraControls (activity_main.xml),
+         Camera Flip was added there too, and View Log moved into
+         Settings' Theme tab (a diagnostic action, not something that
+         needs to be a quick-access icon). This view's only remaining
+         job is the live Controls buttons below, populated by
+         MainActivity at runtime — auto-hide/tap-to-show still applies
+         to this whole view exactly as before, unchanged. -->
 
     <!-- Rows of user-configured Control buttons (from the Controls screen)
          get added here at runtime by MainActivity — empty by default. -->

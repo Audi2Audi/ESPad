@@ -602,6 +602,22 @@ class SettingsDialogFragment : DialogFragment() {
             (activity as? MainActivity)?.exportCurrentLayout()
         }
         contentArea?.addView(btnExportLayout)
+
+        addDivider()
+        addSectionHeader("DIAGNOSTICS")
+        addHint("Was its own icon in the on-screen button drawer — moved here since it's an occasional debug action, not something needing quick-access.")
+        val btnViewLog = Button(requireContext()).apply {
+            text = "📋  View Log"
+            textSize = 12f
+            isAllCaps = false
+            setBackgroundResource(R.drawable.btn_car_bg)
+            setTextColor(0xFFFFFFFF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 40.dp)
+        }
+        btnViewLog.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), LogViewerActivity::class.java))
+        }
+        contentArea?.addView(btnViewLog)
     }
 
     // ── Controller Tab — embedded controller mapping ──────────────────

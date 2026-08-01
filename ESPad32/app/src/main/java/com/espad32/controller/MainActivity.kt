@@ -175,6 +175,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         findViewById<android.widget.Button>(R.id.btnPinMapperOverlay).setOnClickListener {
             startActivity(Intent(this@MainActivity, com.espad32.controller.pinmapper.PinMapperActivity::class.java))
         }
+        findViewById<android.widget.Button>(R.id.btnCameraFlipOverlay).setOnClickListener {
+            cameraStream?.let { it.flipped = !it.flipped }
+        }
         findViewById<android.widget.Button>(R.id.btnControlsOverlay).setOnClickListener {
             startActivity(Intent(this@MainActivity, com.espad32.controller.controls.ControlsActivity::class.java))
         }
@@ -187,13 +190,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         findViewById<android.view.View>(R.id.cameraPlaceholder)?.visibility = android.view.View.VISIBLE
         applyLastActiveProfileThenConnect()
 
-        controlPanelView.setButtonListener(object : ControlPanelView.ButtonListener {
-            override fun onCameraFlip()                 { showUiTemporarily(); cameraStream?.let { it.flipped = !it.flipped } }
-            override fun onTakePhoto()                  { showUiTemporarily(); takePhoto() }
-            override fun onToggleRecording()            { showUiTemporarily(); toggleRecording() }
-            override fun onViewLog()                    { showUiTemporarily(); startActivity(Intent(this@MainActivity, LogViewerActivity::class.java)) }
-            override fun onSettings()                   { showUiTemporarily(); showSettings() }
-        })
+        // Was controlPanelView.setButtonListener(...) here, wiring
+        // Photo/Record/View Log/Camera Flip/Settings callbacks — removed
+        // along with ControlPanelView's ButtonListener interface and
+        // row 1's buttons. Photo/Record/Settings already have listeners
+        // above via cameraControls' own buttons; Camera Flip got a new
+        // listener there too; View Log moved into Settings' Theme tab.
 
         startMotorLoop()
         startSenderLoop()
@@ -1573,11 +1575,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val hasCamera = com.espad32.controller.pinmapper.Boards.byKey(boardKey).supportsCamera
 
         val visibility = if (hasCamera) android.view.View.VISIBLE else android.view.View.GONE
-        findViewById<android.view.View>(R.id.btnPhoto)?.visibility = visibility
-        findViewById<android.view.View>(R.id.btnRecord)?.visibility = visibility
-        findViewById<android.view.View>(R.id.btnCameraFlip)?.visibility = visibility
         findViewById<android.view.View>(R.id.btnPhotoOverlay)?.visibility = visibility
         findViewById<android.view.View>(R.id.btnRecordOverlay)?.visibility = visibility
+        findViewById<android.view.View>(R.id.btnCameraFlipOverlay)?.visibility = visibility
     }
 
     private fun renderLiveButtons() {
