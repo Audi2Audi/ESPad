@@ -84,6 +84,44 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **A real, more serious gap caught before testing, not after: Live
+      Controls had no rendering case for either new I2C role type at
+      all** (v22 firmware, delivered as a zip). Found while walking
+      through "how do I test this from the web UI" — `I2C_MOTOR_DIR`
+      happened to render correctly by falling into the generic toggle
+      bucket (it genuinely does want a toggle sending plain `SET`, so
+      this was accidentally-but-actually correct), but
+      `I2C_MOTOR_SPEED` fell into that exact same bucket too, meaning
+      it would have rendered as an on/off button instead of a 0-255
+      slider, sending `action:'set'` instead of `'setv'`.
+      - **Why this mattered more than a cosmetic UI mismatch**:
+        `handleSetCommand` had no guard for `I2C_MOTOR_SPEED` at all —
+        a misdirected `SET` would have silently fallen through to a
+        plain `digitalWrite` on the reinterpreted channel number (0 or
+        1) treated as if it were a real GPIO. GPIO 0 is a genuine
+        strapping pin, not a harmless target for a stray write.
+      - **Fixed on both sides, not just the visible one**: gave
+        `I2C_MOTOR_SPEED` its own explicit slider branch in the web
+        UI's `renderLiveControls()` (sending `'setv'` correctly), made
+        `I2C_MOTOR_DIR`'s toggle behavior an explicit, documented
+        choice rather than an accidental fallthrough, and — defense in
+        depth — added a firmware-side guard in `handleSetCommand`
+        that explicitly rejects a `SET` aimed at an `I2C_MOTOR_SPEED`
+        role, so a future bug in some OTHER caller (not just this one
+        JS path) can't reach the same danger.
+      - **Checked `handleGetCommand` for the same class of gap while
+        already in this code, found it too**: no role-type check
+        existed before its `analogReadMilliVolts()` call either — lower
+        risk than the SET/SETV cases (read-only, no hardware-damage
+        concern), but still meaningless/wrong if triggered on any of
+        the three reinterpreted types. Closed the same way rather than
+        leaving one path in this class of bug unguarded.
+      **Not yet tested against real hardware** — this was caught by
+      reading the actual rendering code before recommending it, not by
+      trying it and seeing what broke.
+
+
+
 - [x] **Real bug found on real hardware — the first actual test of
       `I2C_MOTOR_DIR`/`I2C_MOTOR_SPEED` immediately surfaced it** (v21
       firmware, delivered as a zip). Creating "Motor A CCW"
