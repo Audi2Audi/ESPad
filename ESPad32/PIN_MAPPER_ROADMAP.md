@@ -84,6 +84,23 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **New app icon and no-camera placeholder logo — updated to the
+      new ESePAD gamepad artwork** (app-only, no firmware). One file
+      replacement covered both asks: no adaptive-icon XML exists in
+      this project (confirmed before touching anything), just flat
+      per-density PNGs, so `ic_launcher.png`/`ic_launcher_round.png`
+      were regenerated at all 5 density buckets (mdpi through xxxhdpi)
+      from the new 500x500 source image. The no-camera placeholder
+      view in `activity_main.xml` already directly references
+      `@mipmap/ic_launcher_round` for its logo, so it picked up the
+      new image automatically without a separate change.
+      **Deliberately did NOT touch the "ESPad32" text label, package
+      name, or any other branding** — the eventual rename to "ESePAD"
+      was noted as a real future step with its own genuinely different
+      risk profile (see the "Pending rename" entry further down this
+      doc), not something to fold into what was explicitly an
+      icon-only ask.
+
 - [x] **Removed genuine duplication between the on-screen button
       drawer and the compact camera-corner icon stack — not two
       separate systems to begin with, discovered while investigating a
@@ -1266,6 +1283,32 @@ originally written, now corrected above for motors/servos):**
       real limitation, not an oversight.
 
 ## Future idea, not started
+
+- **Pending rename: "ESPad32" → "ESePAD"** (noted directly, not yet
+  started). Worth splitting into two genuinely different scopes before
+  treating this as one task, since their risk profiles are completely
+  different:
+  - **Cosmetic rename — low risk.** Display name, the "ESPad32" text
+    label under the placeholder logo (`activity_main.xml`), README/doc
+    references, GitHub repo name if desired. Straightforward find-and-
+    replace-style work, nothing structurally risky about it.
+  - **Package name change (`com.espad32.controller` → something like
+    `com.esepad.controller`) — genuinely disruptive, not just a bigger
+    version of the cosmetic rename.** Android treats the package name
+    as the app's actual identity — changing it means every existing
+    install is treated as a completely different app, not an update.
+    Anyone with the current app installed would lose every saved
+    profile, pin mapping, layout customization, and preference on
+    upgrade unless a real migration path gets built first (or they're
+    just told to expect a fresh start). This needs to be a deliberate
+    decision, made explicitly, not something that happens as a side
+    effect of "let's rename some strings."
+  - **App icon and placeholder logo already updated** to the new
+    ESePAD gamepad artwork (see the entry logging that directly) —
+    done ahead of the rest of the rename since it was asked for
+    directly and doesn't carry either of the risks above; the
+    underlying resource ids (`ic_launcher`/`ic_launcher_round`) and the
+    package/text branding were deliberately left untouched.
 
 - **Broader vision, stated directly and worth recording precisely: this
   app becoming "as universal as reasonably possible"** — real compiled
