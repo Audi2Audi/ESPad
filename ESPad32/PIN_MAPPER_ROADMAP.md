@@ -84,6 +84,34 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **I2C bus scanner added, in direct response to a real "shield not
+      responding" report** (v24 firmware, delivered as a zip). The
+      v23 diagnostic fix correctly reported an I2C write failure — but
+      that's a protocol-level failure (no ACK at all), which is more
+      fundamental than the STBY jumper theory being investigated at
+      the time: STBY only gates the H-bridge's output stage, the
+      shield's onboard microcontroller should still acknowledge basic
+      I2C communication regardless of STBY's state. Rather than keep
+      guessing between wiring, shield power, and address as separate
+      individual theories, built the single most definitive diagnostic
+      instead: `i2cMotor_scanBus()` sweeps every possible 7-bit address
+      (1-127) and reports which ones actually ACK.
+      - Exposed two ways: a new `CMD_I2C_SCAN` TCP command, and a
+        "Scan I2C Bus" button in a new Diagnostics section in the web
+        UI (the front door actually being used for this
+        troubleshooting session) — reports either the hex addresses
+        found, or an explicit "none found" message distinguishing a
+        completely silent bus from a wrong-address one.
+      **Not yet run against the actual hardware** — built directly in
+      response to the failure report, to be tried next rather than
+      continuing to guess. If it comes back with `0x30`, the wiring/
+      power/address are all fine and the issue is somewhere in the
+      protocol details or STBY state specifically; if it comes back
+      empty, the issue is more fundamental than anything address- or
+      jumper-related.
+
+
+
 - [x] **Fixed a real diagnostic blind spot found while troubleshooting
       the first actual hardware test** (v23 firmware, delivered as a
       zip): "voltage across A1/A2 stays low" with no other symptom to
