@@ -84,6 +84,37 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Fixed a real diagnostic blind spot found while troubleshooting
+      the first actual hardware test** (v23 firmware, delivered as a
+      zip): "voltage across A1/A2 stays low" with no other symptom to
+      go on. Turned out our own firmware was throwing away the one
+      piece of information that would actually narrow this down —
+      `i2cMotor_setMotor()`'s I2C transmission result (`Wire.end
+      Transmission()`'s return code) was captured but never checked or
+      surfaced anywhere. Whether the shield genuinely received and
+      acted on a command, or the I2C write failed outright (nothing at
+      the address, bus locked up, bad wiring), both looked identical
+      to the person testing it — "OK" either way.
+      - `i2cMotor_recomputeAndSend()`/`i2cMotor_handleDirSet()`/
+        `i2cMotor_handleSpeedSet()` now all return whether the I2C
+        write actually succeeded, propagated up to `handleSetCommand`/
+        `handleSetValueCommand`, which now report "I2C write failed —
+        check VM power, STBY jumper mode, I2C wiring/address" instead
+        of a blanket "OK" when the transmission itself didn't go
+        through.
+      - **The STBY jumper is the leading suspect for the actual
+        hardware issue, not yet resolved**: this shield family has a
+        documented jumper/solder-pad selecting whether STBY is
+        controlled via I2C or via a direct S pin (confirmed in the
+        original research this session). This firmware only ever
+        assumed pure I2C-controlled STBY — if the physical jumper is
+        set to the other mode, the H-bridge stays disabled regardless
+        of any I2C command, which would produce exactly the symptom
+        reported (commands accepted, motor/LED never responds). Worth
+        checking directly before assuming a deeper firmware problem.
+
+
+
 - [x] **A real, more serious gap caught before testing, not after: Live
       Controls had no rendering case for either new I2C role type at
       all** (v22 firmware, delivered as a zip). Found while walking
