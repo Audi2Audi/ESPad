@@ -84,6 +84,47 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Removed genuine duplication between the on-screen button
+      drawer and the compact camera-corner icon stack — not two
+      separate systems to begin with, discovered while investigating a
+      "does this drawer still earn its keep" question.** `showUi()`/
+      `hideUi()` already tie `ControlPanelView` (the drawer) and
+      `cameraControls` (the compact 📸⏺⚙📌🔘 icon stack) together as
+      one toggle's two states — drawer shown means icons hidden and
+      vice versa, both already with tap-to-show/tap-to-hide/10-second
+      auto-hide. That part was never in question or changed. Within
+      that existing system, though: Photo/Record/Settings were
+      genuinely duplicated (full labeled buttons in the drawer, compact
+      icons in `cameraControls`), while View Log and Camera Flip only
+      ever existed in the drawer.
+      - Removed row 1 (Photo/Record/View Log/Camera Flip/Settings)
+        entirely from `view_control_panel.xml` — Photo/Record/Settings
+        were already fully covered by `cameraControls`'s existing icons.
+      - Added a Camera Flip icon to `cameraControls` so it isn't lost.
+      - Moved View Log into Settings' Theme tab as a proper menu item —
+        a diagnostic action, not something that needs to be a
+        quick-access icon on the main driving screen.
+      - `ControlPanelView` simplified to just host the live Controls
+        buttons (the actually-important part for actually driving —
+        e.g. "Forward") — its `ButtonListener` interface was removed
+        entirely, not left dead, since nothing was left to call it.
+      - **Real cleanup caught while doing this, not just the planned
+        change**: `updateCameraUiVisibility()` still had `findViewById`
+        calls (safely null-checked via `?.`, so not crashing, but doing
+        nothing) referencing the now-deleted row-1 button ids
+        (`btnPhoto`/`btnRecord`/`btnCameraFlip`) — fixed to reference
+        the surviving `cameraControls` overlay ids instead, including
+        the newly-added Camera Flip one.
+      **Auto-hide/tap-to-show behavior is completely unchanged
+      throughout** — this only removed genuine duplication within the
+      existing system, not any interaction pattern. Confirmed directly
+      by the person reporting this, after an initial back-and-forth to
+      correctly identify that the drawer and compact icons were already
+      one system rather than two — worth remembering that distinction
+      if this area comes up again.
+
+
+
 - [x] **Bidirectional Drive axis function — one input controls forward/
       reverse direction AND speed together** (app-only, no firmware).
       Requested as "drive with D-pad up/down, or alternatively left
