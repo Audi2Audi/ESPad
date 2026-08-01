@@ -84,6 +84,50 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Real bug found on real hardware — the first actual test of
+      `I2C_MOTOR_DIR`/`I2C_MOTOR_SPEED` immediately surfaced it** (v21
+      firmware, delivered as a zip). Creating "Motor A CCW"
+      (`I2C_MOTOR_DIR`, encoded value 0) and "Motor A Speed"
+      (`I2C_MOTOR_SPEED`, encoded value 0) got rejected with "that GPIO
+      is already used by another function" — even though these two
+      roles don't share any real resource at all; they just happen to
+      both encode to the number 0 for completely unrelated reasons
+      (one means "channel A, CCW slot," the other means "channel A").
+      **Root cause: the duplicate-GPIO collision check compared raw
+      numbers only, with no awareness of role type at all** — a bug
+      that was always latent in `AUDIO_SIGNAL` too (a clip index of 0
+      would have collided with any real GPIO 0 role, or with an
+      `I2C_MOTOR_SPEED` channel 0), just never actually triggered until
+      this specific combination got tested.
+      - **The real fix isn't "ignore reinterpreted types" — it's type-
+        aware collision logic**: a raw number match is only a genuine
+        conflict when both roles represent the SAME kind of resource.
+        Two genuine GPIO-based roles (any combination of
+        `DIGITAL_OUTPUT`/`PWM_OUTPUT`/`SERVO`/`ANALOG_INPUT`) sharing a
+        number is still correctly rejected — two things can't own one
+        real pin. Two roles of the exact same reinterpreted type
+        sharing an encoded value is ALSO still correctly rejected (two
+        `I2C_MOTOR_DIR` roles both meaning "channel A CCW" would be a
+        genuine conflict). Only a real-GPIO-type vs. a reinterpreted-
+        type, or two DIFFERENT reinterpreted types, sharing a number is
+        NOT a real conflict — since they occupy separate value spaces
+        entirely, this case was the actual bug.
+      - New shared `gpioValuesCollide()` / `isRealGpioType()` helpers in
+        `pin_validation.h`, used consistently across all THREE places
+        this exact check existed independently: the web UI's
+        `POST /api/config`, its import path, and the main `.ino`'s
+        JSON-payload handler — found and fixed all three in the same
+        pass rather than patching only the one that happened to be hit
+        first.
+      **This is exactly the kind of bug that only a real hardware test
+      surfaces** — no amount of code review catches "these two
+      specific values happen to collide" without actually trying to
+      create both roles. Good validation that testing this against
+      real hardware, even before the app-side UI work, was worth doing
+      now rather than waiting.
+
+
+
 - [x] **New ESePAD logo added to the device-hosted web UI** (v20
       firmware, delivered as a zip). Direct follow-up to the app icon/
       placeholder logo update — the web UI is a completely separate
