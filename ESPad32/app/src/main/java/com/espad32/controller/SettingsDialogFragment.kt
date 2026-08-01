@@ -586,6 +586,22 @@ class SettingsDialogFragment : DialogFragment() {
             (activity as? MainActivity)?.resetCustomLayout()
         }
         contentArea?.addView(btnResetLayout)
+
+        addHint("Logs every saved position as dp values — check Log Viewer's Share Log button to get them out.")
+        val btnExportLayout = Button(requireContext()).apply {
+            text = "Export Current Layout"
+            textSize = 12f
+            isAllCaps = false
+            setBackgroundResource(R.drawable.btn_car_bg)
+            setTextColor(0xFFFFFFFF.toInt())
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 40.dp).apply {
+                topMargin = 8.dp
+            }
+        }
+        btnExportLayout.setOnClickListener {
+            (activity as? MainActivity)?.exportCurrentLayout()
+        }
+        contentArea?.addView(btnExportLayout)
     }
 
     // ── Controller Tab — embedded controller mapping ──────────────────

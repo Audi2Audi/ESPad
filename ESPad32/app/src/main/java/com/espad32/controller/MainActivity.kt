@@ -921,6 +921,32 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         CarLogger.log("Main", "Custom layout reset to defaults.")
     }
 
+    // Logs every saved layout offset in dp (not raw pixels — dp is
+    // resolution-independent, matching every other measurement in
+    // renderVirtualButtons(), so these values can be hardcoded directly
+    // as new defaults there). Written via CarLogger, which already has
+    // a working "Share Log" button (LogViewerActivity) — no new export
+    // mechanism needed, just something worth actually logging.
+    fun exportCurrentLayout() {
+        val prefs = getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE)
+        val density = resources.displayMetrics.density
+        val keys = listOf(
+            "layout_joystick_left", "layout_joystick_right",
+            "layout_gamepad_diamond", "layout_gamepad_l1", "layout_gamepad_l2",
+            "layout_gamepad_r1", "layout_gamepad_r2", "layout_gamepad_select",
+            "layout_gamepad_l3", "layout_gamepad_r3", "layout_gamepad_start"
+        )
+        CarLogger.log("Main", "=== Current Layout (dp offsets) ===")
+        keys.forEach { key ->
+            val xPx = prefs.getFloat("${key}_x", 0f)
+            val yPx = prefs.getFloat("${key}_y", 0f)
+            val xDp = Math.round(xPx / density)
+            val yDp = Math.round(yPx / density)
+            CarLogger.log("Main", "$key: ($xDp, $yDp)")
+        }
+        CarLogger.log("Main", "=== End Current Layout ===")
+    }
+
     private fun applyJoystickVisibility() {
         val vis = if (joysticksEnabled) android.view.View.VISIBLE else android.view.View.GONE
         joystickLeft.visibility  = vis
