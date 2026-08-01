@@ -84,6 +84,47 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Train hardware testing paused, parts on order — logged for
+      continuity given how much ground the I2C shield investigation
+      covered.** Current state, as of pausing: the shield's own I2C
+      bus reads SCL stuck low (a classic lockup signature, matching
+      the shield's documented factory-firmware bug), a full
+      simultaneous power cycle didn't clear it, and the I2C scanner
+      (v24) found nothing responding at all. The actual fix path
+      identified — reflashing the shield's onboard microcontroller via
+      its UART bootloader (exact procedure, commands, and a firmware
+      binary link were worked out and handed off) — needs a proper
+      USB-to-TTL adapter, which is now on order (an FT232H-based
+      module, chosen for genuine multi-protocol capability beyond just
+      this one task, not just the cheapest single-purpose option).
+      - **A backup path was also identified along the way and is being
+        pursued in parallel**: L298N modules already on hand would
+        work (confirmed pinout/wiring, maps onto the exact same "2
+        direction pins + 1 PWM speed pin" role model already built),
+        but carry a real, relevant downside given the Train's 4.5V
+        supply specifically — the L298N's unusually large ~2V internal
+        drop leaves only ~2.5V actually reaching the motor, a
+        meaningfully weaker result than a modern MOSFET-based driver
+        would give from the same battery pack.
+      - **Decision made: order plain TB6612FNG breakout boards as
+        backup instead** — the same, already-proven part the dollar-
+        store car uses (direct GPIO, no I2C, no onboard microcontroller
+        to lock up, minimal voltage drop) — rather than settle for the
+        L298N's voltage penalty or keep fighting the I2C shield's
+        reliability issues.
+      - **To resume once parts arrive**: if going the shield-firmware
+        route, the UART bootloader procedure and exact `stm32flash`
+        commands are already documented in this conversation's history
+        — the D1 Mini needs a blank sketch uploaded first, RTS bridged
+        to 3V on the shield temporarily, then unbridged afterward. If
+        going the TB6612FNG-backup route instead, it's the exact same
+        wiring/profile setup already built and tested for the dollar-
+        store car (Motor direction A/B + Motor speed, GPIO16/17/4) —
+        no new firmware or app work needed, just physically wiring the
+        Train the same way.
+
+
+
 - [x] **I2C bus scanner added, in direct response to a real "shield not
       responding" report** (v24 firmware, delivered as a zip). The
       v23 diagnostic fix correctly reported an I2C write failure — but
