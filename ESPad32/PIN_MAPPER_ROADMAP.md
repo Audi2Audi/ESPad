@@ -84,6 +84,104 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Real motor shield discovery, then real I2C driver support built
+      for it** (v19 firmware, delivered as a zip). Started as "walk
+      through wiring a test LED to the Train's motor driver" — a
+      packaging photo revealed the actual hardware (CANADUINO/
+      Universal-Solder's Wemos D1 Mini Motor Driver Shield) is a
+      **clone of the genuine WeMos I2C motor shield, not a plain
+      direct-GPIO TB6612FNG breakout** like the dollar-store-car uses.
+      Confirmed independently across multiple sources, including
+      someone who tested this exact board family directly: *"the only
+      control pins brought out to the header pads is the serial I2C
+      pins for the built-in microcontroller."* The shield has its own
+      onboard microcontroller (an STM32F030, per public teardowns)
+      that receives I2C commands and drives the TB6612FNG internally —
+      AIN1/AIN2/PWMA are never reachable from other ESP32 GPIOs at all
+      on this hardware. **Every earlier assumption about this specific
+      shield (GPIO-based wiring, the Guided Setup walkthrough) was
+      wrong** — worth being direct about that rather than let it stand
+      uncorrected. This is the exact same category of gap already
+      logged for the Freenove car's PCA9685 (see the driver-abstraction
+      entries above) — a second real-world case of it, not a one-off.
+      - **Protocol confirmed from WeMos's own official library source**
+        (github.com/wemos/WEMOS_Motor_Shield_Arduino_Library), not
+        guessed: a 4-byte "set motor" I2C write — `channel|0x10`,
+        direction (0 short-brake/1 CCW/2 CW/3 stop/4 standby), then a
+        16-bit speed percentage (0.00-100.00% ×100, clamped) split
+        across 2 bytes. Default address `0x30`; fixed I2C pins on a
+        D1 Mini for this shield (D1/GPIO5=SCL, D2/GPIO4=SDA) — these
+        are fixed by the shield's own physical stacking design, so
+        firmware constants here, not assignable roles, same reasoning
+        as `audio_signal.h`'s fixed I2S pins.
+      - **Known risk, worth carrying forward rather than discovering
+        the hard way**: the original WeMos factory firmware on this
+        shield family has a documented I2C bus hard-lock bug requiring
+        a power cycle to recover. Not something this firmware can fix —
+        the bug lives in the shield's own onboard microcontroller. A
+        community rewrite exists (github.com/pbugalski/wemos_motor_shield)
+        if this turns out to be unreliable in practice, but reflashing
+        the shield's own STM32F030 is a separate project needing its
+        own UART/bootloader access.
+      - **New `i2c_motor_shield.h`** implementing the confirmed
+        protocol directly via the ESP32 core's built-in `Wire` library
+        (no new library needed, same as I2S was for audio).
+      - **Role type scheme, following the `AUDIO_SIGNAL` precedent of
+        reinterpreting "gpio" rather than needing a schema change**:
+        `I2C_MOTOR_DIR` (two roles per physical channel — a CCW-role
+        and a CW-role, matching the existing two-toggle Bidirectional
+        Drive model exactly, encoded as `(channel<<4)|directionSlot`)
+        and `I2C_MOTOR_SPEED` (one role per channel, encoded as just
+        the channel number). **The shield's protocol needs direction
+        and speed sent together in one write — genuinely different
+        from the normal SET/SETV model where they're independent
+        commands.** Solved by tracking per-channel state firmware-side
+        and recomputing+resending the full combined command whenever
+        either a direction role or the speed role changes — meaning
+        the existing SET/SETV commands, Controls toggles, and the
+        Bidirectional Drive axis function all keep working completely
+        unchanged once these roles exist, no app-side protocol changes
+        needed for the parts that already exist.
+      - **Real bugs caught and fixed before this shipped, not left for
+        testing to find**: an actual invalid-C++ typo (`:=`, which
+        isn't a real operator in this language) written into the first
+        draft of the `I2C_MOTOR_DIR` dispatch branch, caught and fixed
+        immediately rather than left for a compile failure to surface.
+        Separately, confirmed `handleSetValueCommand` doesn't check
+        role type at all before its `ledcAttach`/`ledcWrite`
+        fallthrough — meaning an `I2C_MOTOR_SPEED` role's reinterpreted
+        channel number (0 or 1) would otherwise get misinterpreted as a
+        real GPIO to PWM-attach, and GPIO 0/1 are strapping/serial-TX
+        pins — a real risk, not just a logic error. Added the same
+        type check there `AUDIO_SIGNAL` already has in the SET-command
+        handler, closing this before it could bite.
+      - Extended the same `board_allowsGpio()`/`validateGpio()` bypass
+        `AUDIO_SIGNAL` already needed to both new types, in all the
+        same call sites (POST /api/config, the import path, and the
+        web UI's pin-dropdown-population endpoint) — same reasoning:
+        these aren't real GPIO numbers, applying chip/board pin rules
+        to them would be applying the wrong rules to the wrong thing.
+      **Deliberately NOT built in this pass, and flagged clearly rather
+      than rushed**: proper Pin Mapper/Controls app-side UI for
+      creating these two role types (a real "which I2C channel, which
+      direction" picker, matching how `AUDIO_SIGNAL` eventually got a
+      real app-side treatment rather than staying firmware-only). The
+      web UI's generic Add Function flow technically works today via
+      the same numeric-encoding trick (the GPIO dropdown will show
+      0/1/16/17 as valid "pins" for these types, mislabeled as "GPIO"
+      even though they mean channel+direction) — functional but not
+      polished, an acceptable rough edge for now given how much ground
+      this single discovery-plus-implementation pass already covered.
+      **Not yet tested against real hardware at all** — a bigger
+      caveat than usual here, given this is a brand new peripheral
+      category for this firmware, not a refinement of something
+      already proven. Good first thing to verify: `SET <ccw-role> 1`
+      should produce an audible/visible motor response in one
+      direction; confirm `SET <cw-role> 1` (with the CCW role off)
+      produces the other before trusting any of this further.
+
+
+
 - [x] **New app icon and no-camera placeholder logo — updated to the
       new ESePAD gamepad artwork** (app-only, no firmware). One file
       replacement covered both asks: no adaptive-icon XML exists in
