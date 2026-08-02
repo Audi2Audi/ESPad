@@ -84,6 +84,25 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Compact icon stack (`cameraControls`) now has its own auto-hide
+      timer** (app-only). Confirmed directly: the drawer already
+      auto-hid into the compact icons after 10 seconds, but the icons
+      themselves had no timeout of their own — stayed visible
+      indefinitely until the next tap. Added a second, chained timer:
+      once `hideUi()` puts the icons into that resting state, they now
+      schedule their own fade-to-invisible after the same interval, for
+      a fully clean camera view when left alone. Any tap still brings
+      everything back immediately — this only adds a further
+      "quiet down" step after continued inactivity, not a new
+      interaction model. Extracted the previously-duplicated magic
+      number into a named `AUTO_HIDE_DELAY_MS` constant, reused by both
+      timers. Caught and fixed a real bug in the first draft before it
+      shipped — an explicit `alpha = 1f` line would have instantly
+      snapped opacity before the fade animation even started, turning
+      a smooth 500ms fade-in into a no-op.
+
+
+
 - [x] **Fixed a real crash opening Controller Mapping — Gson silently
       nulling enum values removed by the earlier cleanup** (app-only).
       Root cause: `ControllerMapping` used a plain `Gson()` to
