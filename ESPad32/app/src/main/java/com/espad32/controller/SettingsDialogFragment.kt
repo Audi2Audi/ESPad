@@ -71,6 +71,7 @@ class SettingsDialogFragment : DialogFragment() {
     private var tabTheme: TextView? = null
     private var tabController: TextView? = null
     private var tabOta: TextView? = null
+    private var tabLog: TextView? = null
     private var currentTab = 0
     private var pickBinLauncher: ((ByteArray) -> Unit)? = null
 
@@ -95,6 +96,7 @@ class SettingsDialogFragment : DialogFragment() {
         tabTheme        = view.findViewById(R.id.tabTheme)
         tabController   = view.findViewById(R.id.tabController)
         tabOta          = view.findViewById(R.id.tabAdvanced)
+        tabLog          = view.findViewById(R.id.tabLog)
 
         etIp?.setText(args.getString("ip"))
         switchJoysticks?.isChecked = args.getBoolean("joysticks")
@@ -104,6 +106,7 @@ class SettingsDialogFragment : DialogFragment() {
         tabTheme?.setOnClickListener      { showTab(1) }
         tabController?.setOnClickListener { showTab(2) }
         tabOta?.setOnClickListener        { showTab(3) }
+        tabLog?.setOnClickListener        { showTab(4) }
 
         view.findViewById<Button>(R.id.btnSettingsClose)?.setOnClickListener { dismiss() }
 
@@ -145,7 +148,7 @@ class SettingsDialogFragment : DialogFragment() {
         currentTab = tab
         val cyan = 0xFF00E5FF.toInt()
         val grey = 0xFF888888.toInt()
-        listOf(tabWifi, tabTheme, tabController, tabOta).forEachIndexed { i, tv ->
+        listOf(tabWifi, tabTheme, tabController, tabOta, tabLog).forEachIndexed { i, tv ->
             tv?.setTextColor(if (i == tab) cyan else grey)
             tv?.setBackgroundColor(if (i == tab) 0xFF1A1A1A.toInt() else 0xFF111111.toInt())
         }
@@ -155,6 +158,7 @@ class SettingsDialogFragment : DialogFragment() {
             1 -> buildThemeTab()
             2 -> buildControllerTab()
             3 -> buildAdvancedTab()
+            4 -> buildLogTab()
         }
     }
 
@@ -602,10 +606,15 @@ class SettingsDialogFragment : DialogFragment() {
             (activity as? MainActivity)?.exportCurrentLayout()
         }
         contentArea?.addView(btnExportLayout)
+    }
 
-        addDivider()
-        addSectionHeader("DIAGNOSTICS")
-        addHint("Was its own icon in the on-screen button drawer — moved here since it's an occasional debug action, not something needing quick-access.")
+    // ── Log Tab — moved here from Theme's old "Diagnostics" section,
+    // per direct feedback: a dedicated tab is a better fit than sharing
+    // space with layout settings, and its own tab underneath OTA groups
+    // it with other occasional/diagnostic actions rather than everyday
+    // display settings.
+    private fun buildLogTab() {
+        addHint("An occasional debug action, not something needing quick-access on the main screen — that's why this isn't a floating icon.")
         val btnViewLog = Button(requireContext()).apply {
             text = "📋  View Log"
             textSize = 12f

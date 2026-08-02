@@ -101,6 +101,11 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:text="📡  OTA" android:textSize="12sp"
                 android:padding="14dp" android:textColor="#888888"/>
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#222222"/>
+            <TextView android:id="@+id/tabLog"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="📋  Log" android:textSize="12sp"
+                android:padding="14dp" android:textColor="#888888"/>
         </LinearLayout>
 
         <!-- Right content area -->
