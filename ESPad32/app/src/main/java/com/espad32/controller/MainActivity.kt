@@ -271,7 +271,20 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     // ── Auto-hide ─────────────────────────────────────────────────────
+    // Two chained timers now, not one: the drawer already auto-hid
+    // into the compact icon stack (cameraControls) after inactivity,
+    // but that compact stack itself had no timeout of its own — it
+    // stayed visible indefinitely until the next tap, confirmed
+    // directly as an actual observation, not assumed. Second timer
+    // added to match: once the compact icons have been sitting idle
+    // for the same interval, they now fade out completely too, for a
+    // fully clean camera view. Any tap still brings everything back
+    // immediately, same single-tap-reveals-everything behavior as
+    // before — this only added a further "quiet down" step after more
+    // inactivity, not a new interaction model.
+    private val AUTO_HIDE_DELAY_MS = 10000L
     private val hideRunnable = Runnable { hideUi() }
+    private val hideCameraControlsRunnable = Runnable { hideCameraControlsCompletely() }
     private fun setupAutoHide() {
         surfaceView.setOnClickListener {
             if (controlPanelView.visibility == android.view.View.VISIBLE) {
@@ -285,8 +298,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
     private fun showUiTemporarily() {
         mainHandler.removeCallbacks(hideRunnable)
+        mainHandler.removeCallbacks(hideCameraControlsRunnable)
         showUi()
-        mainHandler.postDelayed(hideRunnable, 10000)
+        mainHandler.postDelayed(hideRunnable, AUTO_HIDE_DELAY_MS)
     }
     private fun showUi() {
         val overlay = findViewById<android.view.View>(R.id.cameraControls)
@@ -307,6 +321,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             controlPanelView.visibility = android.view.View.INVISIBLE
         }.start()
         if (!mediaSaver.isRecording()) tvRecording.visibility = android.view.View.INVISIBLE
+        mainHandler.removeCallbacks(hideCameraControlsRunnable)
+        mainHandler.postDelayed(hideCameraControlsRunnable, AUTO_HIDE_DELAY_MS)
+    }
+    private fun hideCameraControlsCompletely() {
+        val overlay = findViewById<android.view.View>(R.id.cameraControls)
+        overlay.animate().alpha(0f).setDuration(500).withEndAction {
+            overlay.visibility = android.view.View.INVISIBLE
+        }.start()
     }
 
     // ── Connection ────────────────────────────────────────────────────
@@ -1824,6 +1846,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onDestroy() {
         super.onDestroy()
         mainHandler.removeCallbacks(hideRunnable)
+        mainHandler.removeCallbacks(hideCameraControlsRunnable)
         if (mediaSaver.isRecording()) mediaSaver.stopRecording()
         // Only fully cancel if actually finishing (not config change)
         highResHandler.removeCallbacks(switchToHighResRunnable)
