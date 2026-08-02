@@ -84,6 +84,15 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Two small, direct UI fixes**: removed the "ESPad32" text label
+      under the no-camera placeholder logo (the logo image alone is
+      enough); gave View Log its own dedicated tab underneath OTA
+      rather than sharing space in Theme's Diagnostics section, per
+      direct feedback that it didn't belong there. New tab wired the
+      same way every other tab already is — no new pattern introduced.
+
+
+
 - [x] **Train hardware testing paused, parts on order — logged for
       continuity given how much ground the I2C shield investigation
       covered.** Current state, as of pausing: the shield's own I2C
