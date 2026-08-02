@@ -3,7 +3,8 @@ package com.espad32.controller
 import android.content.Context
 import android.view.KeyEvent
 import android.view.MotionEvent
-import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonDeserializer
 import com.google.gson.reflect.TypeToken
 
 // ── All assignable functions ──────────────────────────────────────────
@@ -93,7 +94,34 @@ object ControllerMapping {
     private const val PREFS_KEY_PROFILE = "activeProfile"
     private const val PREFS_KEY_BUTTONS = "customButtons"
     private const val PREFS_KEY_AXES    = "customAxes"
-    private val gson = Gson()
+    // A plain Gson() here would be a real crash risk, not a theoretical
+    // one: standard Gson enum deserialization silently maps an
+    // unrecognized string to null rather than throwing — and it can do
+    // that even for a Kotlin non-nullable field, via reflection
+    // bypassing Kotlin's own null-safety checks entirely. Any
+    // previously-saved mapping still referencing one of the 15 removed
+    // ButtonFunction values or 4 removed AxisFunction values (e.g.
+    // "HORN_ON", "DRIVE" — genuinely present in this app's persisted
+    // state before that cleanup, not a hypothetical) would produce an
+    // "impossible" null the surrounding try/catch in load() below
+    // can't catch, since gson.fromJson() itself never throws for this
+    // case — the crash happens downstream, wherever that null value
+    // first gets used. Fixed at the source instead: these two custom
+    // deserializers make an unrecognized name fall back to NONE
+    // explicitly, so no invalid value can ever be constructed in the
+    // first place, now or if any future enum value ever gets removed.
+    private val gson = GsonBuilder()
+        .registerTypeAdapter(ButtonFunction::class.java, object : JsonDeserializer<ButtonFunction> {
+            override fun deserialize(json: com.google.gson.JsonElement, typeOfT: java.lang.reflect.Type, context: com.google.gson.JsonDeserializationContext): ButtonFunction {
+                return try { ButtonFunction.valueOf(json.asString) } catch (e: Exception) { ButtonFunction.NONE }
+            }
+        })
+        .registerTypeAdapter(AxisFunction::class.java, object : JsonDeserializer<AxisFunction> {
+            override fun deserialize(json: com.google.gson.JsonElement, typeOfT: java.lang.reflect.Type, context: com.google.gson.JsonDeserializationContext): AxisFunction {
+                return try { AxisFunction.valueOf(json.asString) } catch (e: Exception) { AxisFunction.NONE }
+            }
+        })
+        .create()
 
     // ── All remappable buttons ────────────────────────────────────────
     // All default to NONE now, not previously-pre-assigned dead
