@@ -84,6 +84,61 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Removed 15 dead `ButtonFunction` values and 4 dead
+      `AxisFunction` values, cleared defaults to blank** (app-only).
+      Raised as a direct question — do all these functions remain
+      relevant, and should the defaults be cleared for the user to
+      assign their own — after screenshots showed Controller Mapping's
+      Buttons tab pre-populated with things like "LED Cycle," "Horn
+      (hold)," "Face Cycle," "Servo Reset," "Light Follow Mode," "Line
+      Track Mode," "Stop Car."
+      - **Audited every single one against what `MainActivity` actually
+        does when it fires, not assumed**: confirmed 15 of 20
+        `ButtonFunction` values send Freenove-specific commands
+        (`CMD_BUZZER`/`CMD_LED_MOD`/`CMD_MATRIX_MOD`/`CMD_CAMERA`/
+        `CMD_CAR_MODE`/`CMD_MOTOR`) this firmware has never understood
+        — genuinely dead, not just undocumented. Same for
+        `AxisFunction`'s `DRIVE`/`TRIGGER_DRIVE`/`STEER_ONLY`/
+        `PAN_TILT`, already flagged dead elsewhere in this doc but
+        never actually removed from being selectable until now.
+      - **Actually removed, not just documented as dead** — matching
+        the same principle already applied to the Pin Ref tab and the
+        drawer's duplicate buttons earlier in this project: a thing
+        that LOOKS selectable/assigned but silently does nothing is
+        worse than not offering it at all.
+      - **Found and removed two entire dead preset profiles along the
+        way** ("Trigger Drive," "D-Pad Drive") — already unreachable
+        (their selection UI was removed earlier in this project's
+        history) and would have failed to compile anyway once the
+        enum values they referenced were gone.
+      - **Cleared `ALL_BUTTONS`/`ALL_AXES` defaults to `NONE`** across
+        the board, so a fresh install starts blank rather than
+        inheriting confidently-labeled assignments that did nothing —
+        **with one deliberate exception, called out rather than
+        silently decided**: L2=Take Photo and R2=Toggle Record were
+        kept, since they're the only two non-`CUSTOM_CONTROL`
+        functions confirmed to actually work with zero setup (local
+        app behavior — capturing from the camera feed, no device
+        command involved at all).
+      - Removed the now-orphaned `currentLedMode`/`currentEmotionMode`
+        variables, only ever read/written by the deleted branches.
+      - **A genuinely bigger, separate finding surfaced during this
+        audit, deliberately NOT fixed in the same pass**: the on-screen
+        joysticks themselves have the same problem. The left joystick's
+        entire drive loop (`sendMotorFromStick()`) sends `CMD_MOTOR`,
+        and the right joystick's pan/tilt sends `CMD_CAMERA` — both
+        confirmed dead, same as everything just removed above. This is
+        a bigger deal than the button/axis mapping cleanup, since the
+        joysticks are the primary way most people would actually try to
+        drive — but rebuilding that mechanism to work like
+        `CUSTOM_BIDIRECTIONAL_DRIVE` does (driving real Pin Mapper
+        roles instead of a hardcoded dead command) is a substantial,
+        separate piece of work, not something to fold into this
+        cleanup. Flagged clearly rather than buried — worth its own
+        focused pass.
+
+
+
 - [x] **Two small, direct UI fixes**: removed the "ESPad32" text label
       under the no-camera placeholder logo (the logo image alone is
       enough); gave View Log its own dedicated tab underneath OTA
