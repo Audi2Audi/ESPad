@@ -84,6 +84,69 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Fixed a real crash opening Controller Mapping — Gson silently
+      nulling enum values removed by the earlier cleanup** (app-only).
+      Root cause: `ControllerMapping` used a plain `Gson()` to
+      deserialize saved mappings from SharedPreferences. Standard Gson
+      enum deserialization silently maps an unrecognized string to
+      null rather than throwing — and can do that even for a Kotlin
+      non-nullable field, via reflection bypassing Kotlin's own
+      null-safety checks entirely. This app's actual persisted state
+      still had assignments like "HORN_ON," "LED_CYCLE," "DRIVE" from
+      before the ButtonFunction/AxisFunction cleanup removed those
+      values — not hypothetical, confirmed directly from the
+      screenshots that prompted that cleanup. Loading that saved data
+      produced an "impossible" null the existing try/catch in `load()`
+      never caught (`gson.fromJson()` itself never throws for this
+      case) — the crash happened downstream, at
+      `displayLabelForButton()` calling `mapping.function.label`
+      directly on what should have been a non-null enum.
+      - Fixed at the source: registered custom `JsonDeserializer`s for
+        both `ButtonFunction` and `AxisFunction` that explicitly fall
+        back to `NONE` for any unrecognized name, so no invalid value
+        can ever be constructed in the first place — now, or if any
+        future enum value ever gets removed. Verified against Gson's
+        own documented pattern for exactly this problem before writing
+        it, given how important it was to get right the first time.
+
+- [x] **Built `CUSTOM_PAN_TILT`, the axis function deliberately left
+      open in the previous joystick fix, and fixed the right joystick
+      to use it** (app-only). Neither `CUSTOM_PWM` (one axis, one
+      value) nor `CUSTOM_BIDIRECTIONAL_DRIVE` (one axis,
+      direction+speed) covers "two axes driving two independent servo
+      roles simultaneously" — this needed its own shape, the same way
+      `CUSTOM_BIDIRECTIONAL_DRIVE` itself was built specifically for
+      the drive case rather than forced into an existing one.
+      - `axisX` maps directly to a pan servo's angle, `axisY` directly
+        to a tilt servo's angle, both 0-180 — **direct position
+        mapping (stick position IS the angle), not incremental/rate-
+        based** like the old dead `PAN_TILT` code was. Simpler, more
+        predictable, and consistent with how `CUSTOM_PWM` already maps
+        position directly to a value.
+      - New `AxisMapping.customButtonId2` field (pairs with the
+        existing `customButtonId`, reused here for the pan servo).
+        Configured via a new 2-step picker (pan, then tilt), same
+        chained pattern the other multi-step pickers already use.
+      - New `executeCustomPanTilt()` resolves both servo Controls
+        buttons and sends independent `SETA` commands for whichever
+        one(s) actually changed, sharing one rate-limit window — no
+        state-combining needed here, unlike Bidirectional Drive's
+        combined write, since pan and tilt are genuinely independent
+        commands.
+      - **Right joystick now routes through this via the same
+        `executeAxisMapping()` dispatch the left joystick already
+        uses**, looked up by its "Right Stick" label the same way.
+        Recenters both servos to 90° on release, avoiding a mismatch
+        where the joystick knob visually snaps back to center but the
+        camera would otherwise stay wherever it last pointed.
+      **With this, both on-screen joysticks and the physical gamepad's
+      axis mapping all go through the exact same, single dispatch
+      mechanism** — no more separate/duplicated/dead code paths for
+      driving vs. pan/tilt vs. physical vs. on-screen input.
+      **Not yet tested against real hardware.**
+
+
+
 - [x] **Left joystick fixed to drive through real axis mappings,
       instead of a dead `CMD_MOTOR` polling loop** (app-only). Direct
       follow-up to the ButtonFunction/AxisFunction cleanup's flagged
