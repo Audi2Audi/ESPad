@@ -90,8 +90,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var osMotorScale = 0.6f
 
     // ── Mode state ────────────────────────────────────────────────────
-    private var currentLedMode     = 0
-    private var currentEmotionMode = 0
+    // Was also home to currentLedMode/currentEmotionMode — removed,
+    // not just left unused, since they were only ever read/written by
+    // the now-deleted LED_CYCLE/FACE_CYCLE ButtonFunction branches.
     private var joysticksEnabled   = false
     private var virtualButtonsEnabled = false
     private var speedCurveExpo    = false
@@ -593,22 +594,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 val x = applyDeadzone(if (mapping.invertX) -rawX else rawX)
                 val y = applyDeadzone(if (mapping.invertY) -rawY else rawY)
                 when (mapping.function) {
-                    AxisFunction.DRIVE        -> { lastLeftX = x; lastLeftY = y }
-                    AxisFunction.TRIGGER_DRIVE -> { lastLeftY = -(rawX - rawY) }
-                    AxisFunction.STEER_ONLY   -> { lastLeftX = x }
-                    AxisFunction.PAN_TILT     -> {
-                        if (x != 0f || y != 0f) {
-                            val now = System.currentTimeMillis()
-                            val newS1 = (servo1Angle - x * g8ServoStep).coerceIn(0f, 180f)
-                            val newS2 = (servo2Angle + y * g8ServoStep).coerceIn(80f, 180f)
-                            if ((Math.abs(newS1-servo1Angle) >= 1f || Math.abs(newS2-servo2Angle) >= 1f)
-                                && (now - lastServoSendTime) >= SERVO_SEND_INTERVAL_MS) {
-                                servo1Angle = newS1; servo2Angle = newS2
-                                lastServoSendTime = now
-                                enqueue("CMD_CAMERA#${servo1Angle.toInt()}#${servo2Angle.toInt()}\n")
-                            }
-                        }
-                    }
                     AxisFunction.NONE -> {}
                     AxisFunction.CUSTOM_PWM -> {
                         // Single-axis only (axisY ignored). Raw axis
@@ -677,7 +662,6 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         } else {
             val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
             when (mapping?.function) {
-                ButtonFunction.HORN_ON -> enqueue("CMD_BUZZER#0#2000\n")
                 ButtonFunction.CUSTOM_CONTROL -> executeCustomControlButton(mapping.customButtonId, pressed = false)
                 else -> {}
             }
@@ -688,24 +672,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val mapping = ControllerMapping.buttons.find { it.keyCode == keyCode }
         val fn = mapping?.function ?: ButtonFunction.NONE
         when (fn) {
-            ButtonFunction.HORN_ON      -> enqueue("CMD_BUZZER#1#2000\n")
             ButtonFunction.PHOTO        -> takePhoto()
             ButtonFunction.RECORD       -> toggleRecording()
-            ButtonFunction.LED_CYCLE    -> { currentLedMode = (currentLedMode+1)%6; enqueue("CMD_LED_MOD#$currentLedMode\n") }
-            ButtonFunction.LED_OFF      -> { currentLedMode = 0; enqueue("CMD_LED_MOD#0\n") }
-            ButtonFunction.FACE_CYCLE   -> { currentEmotionMode = (currentEmotionMode+1)%8; enqueue("CMD_MATRIX_MOD#$currentEmotionMode\n") }
-            ButtonFunction.FACE_OFF     -> { currentEmotionMode = 0; enqueue("CMD_MATRIX_MOD#0\n") }
             ButtonFunction.CAMERA_FLIP  -> cameraStream?.let { it.flipped = !it.flipped }
-            ButtonFunction.SERVO_RESET  -> { servo1Angle = 90f; servo2Angle = 90f; enqueue("CMD_CAMERA#90#90\n") }
-            ButtonFunction.PAN_LEFT     -> { servo1Angle = (servo1Angle + g8ServoStep).coerceIn(0f,180f); enqueue("CMD_CAMERA#${servo1Angle.toInt()}#${servo2Angle.toInt()}\n") }
-            ButtonFunction.PAN_RIGHT    -> { servo1Angle = (servo1Angle - g8ServoStep).coerceIn(0f,180f); enqueue("CMD_CAMERA#${servo1Angle.toInt()}#${servo2Angle.toInt()}\n") }
-            ButtonFunction.TILT_UP      -> { servo2Angle = (servo2Angle - g8ServoStep).coerceIn(80f,180f); enqueue("CMD_CAMERA#${servo1Angle.toInt()}#${servo2Angle.toInt()}\n") }
-            ButtonFunction.TILT_DOWN    -> { servo2Angle = (servo2Angle + g8ServoStep).coerceIn(80f,180f); enqueue("CMD_CAMERA#${servo1Angle.toInt()}#${servo2Angle.toInt()}\n") }
-            ButtonFunction.PAN_CENTER   -> { servo1Angle = 90f; enqueue("CMD_CAMERA#90#${servo2Angle.toInt()}\n") }
-            ButtonFunction.TILT_CENTER  -> { servo2Angle = 90f; enqueue("CMD_CAMERA#${servo1Angle.toInt()}#90\n") }
-            ButtonFunction.LIGHT_FOLLOW -> enqueue("CMD_CAR_MODE#1\n")
-            ButtonFunction.LINE_TRACK   -> enqueue("CMD_CAR_MODE#2\n")
-            ButtonFunction.STOP         -> enqueue("CMD_MOTOR#0#0#0#0\n")
             ButtonFunction.CUSTOM_CONTROL -> executeCustomControlButton(mapping?.customButtonId)
             ButtonFunction.NONE         -> {}
         }

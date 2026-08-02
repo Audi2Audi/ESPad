@@ -7,37 +7,34 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
 // ── All assignable functions ──────────────────────────────────────────
+// Was 20 values — 15 have been removed here (HORN_ON, LED_CYCLE,
+// LED_OFF, FACE_CYCLE, FACE_OFF, SERVO_RESET, PAN_LEFT, PAN_RIGHT,
+// TILT_UP, TILT_DOWN, PAN_CENTER, TILT_CENTER, LIGHT_FOLLOW,
+// LINE_TRACK, STOP) after confirming every one of them sent a
+// Freenove-specific command (CMD_BUZZER/CMD_LED_MOD/CMD_MATRIX_MOD/
+// CMD_CAMERA/CMD_CAR_MODE/CMD_MOTOR) this firmware has never
+// understood — not just undocumented as dead, actually removed, so
+// they can't be selected or silently pre-assigned as if they worked.
+// PHOTO/RECORD/CAMERA_FLIP are genuinely fine — they're local app
+// behavior (capturing from the camera feed, flipping its display
+// orientation), no device command involved at all.
 enum class ButtonFunction(val label: String) {
     NONE("Nothing"),
-    HORN_ON("Horn (hold)"),
     PHOTO("Take Photo"),
     RECORD("Toggle Record"),
-    LED_CYCLE("LED Cycle"),
-    LED_OFF("LED Off"),
-    FACE_CYCLE("Face Cycle"),
-    FACE_OFF("Face Off"),
     CAMERA_FLIP("Camera Flip"),
-    SERVO_RESET("Servo Reset (both)"),
-    PAN_LEFT("Pan Left"),
-    PAN_RIGHT("Pan Right"),
-    TILT_UP("Tilt Up"),
-    TILT_DOWN("Tilt Down"),
-    PAN_CENTER("Pan Center (90°)"),
-    TILT_CENTER("Tilt Center (90°)"),
-    LIGHT_FOLLOW("Light Follow Mode"),
-    LINE_TRACK("Line Track Mode"),
-    STOP("Stop Car"),
     // Triggers one of the user-defined Controls buttons (e.g. "LED")
     // instead of a fixed car command — see ButtonMapping.customButtonId.
     CUSTOM_CONTROL("Custom Control Button")
 }
 
+// Was also home to DRIVE/TRIGGER_DRIVE/STEER_ONLY/PAN_TILT — removed
+// here for the same reason as ButtonFunction's cleanup above: each
+// sent CMD_MOTOR or CMD_CAMERA, confirmed dead. These were already
+// documented as dead in this project's history, but never actually
+// removed from being selectable until now.
 enum class AxisFunction(val label: String) {
     NONE("Nothing"),
-    DRIVE("Drive (throttle + steer)"),
-    TRIGGER_DRIVE("Trigger Drive (fwd/rev)"),
-    STEER_ONLY("Steer Only (left/right)"),
-    PAN_TILT("Camera Pan/Tilt"),
     // Drives one of the user-defined Controls sliders (a PWM_OUTPUT
     // role, e.g. "Motor speed") using a single axis — see
     // AxisMapping.customButtonId. Only axisX is used; axisY is ignored
@@ -99,36 +96,41 @@ object ControllerMapping {
     private val gson = Gson()
 
     // ── All remappable buttons ────────────────────────────────────────
+    // All default to NONE now, not previously-pre-assigned dead
+    // functions — a fresh install should start blank and let the user
+    // build their own mapping via CUSTOM_CONTROL, not inherit
+    // confidently-looking assignments that turned out to do nothing.
     val ALL_BUTTONS = listOf(
-        Triple(KeyEvent.KEYCODE_BUTTON_A,    "A Button",      ButtonFunction.CAMERA_FLIP),
-        Triple(KeyEvent.KEYCODE_BUTTON_B,    "B Button",      ButtonFunction.LED_CYCLE),
-        Triple(KeyEvent.KEYCODE_BUTTON_X,    "X Button",      ButtonFunction.HORN_ON),
-        Triple(KeyEvent.KEYCODE_BUTTON_Y,    "Y Button",      ButtonFunction.FACE_CYCLE),
-        Triple(KeyEvent.KEYCODE_BUTTON_L1,   "L1",            ButtonFunction.SERVO_RESET),
+        Triple(KeyEvent.KEYCODE_BUTTON_A,    "A Button",      ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_BUTTON_B,    "B Button",      ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_BUTTON_X,    "X Button",      ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_BUTTON_Y,    "Y Button",      ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_BUTTON_L1,   "L1",            ButtonFunction.NONE),
         Triple(KeyEvent.KEYCODE_BUTTON_R1,   "R1",            ButtonFunction.NONE),
         Triple(KeyEvent.KEYCODE_BUTTON_L2,   "L2 / Left Trigger",  ButtonFunction.PHOTO),
         Triple(KeyEvent.KEYCODE_BUTTON_R2,   "R2 / Right Trigger", ButtonFunction.RECORD),
-        Triple(KeyEvent.KEYCODE_DPAD_UP,     "D-Pad Up",      ButtonFunction.TILT_UP),
-        Triple(KeyEvent.KEYCODE_DPAD_DOWN,   "D-Pad Down",    ButtonFunction.TILT_DOWN),
-        Triple(KeyEvent.KEYCODE_DPAD_LEFT,   "D-Pad Left",    ButtonFunction.PAN_LEFT),
-        Triple(KeyEvent.KEYCODE_DPAD_RIGHT,  "D-Pad Right",   ButtonFunction.PAN_RIGHT),
-        Triple(KeyEvent.KEYCODE_BUTTON_THUMBL, "Left Stick Click",  ButtonFunction.LIGHT_FOLLOW),
-        Triple(KeyEvent.KEYCODE_BUTTON_THUMBR, "Right Stick Click", ButtonFunction.LINE_TRACK),
-        Triple(KeyEvent.KEYCODE_BUTTON_START,  "Start/Menu",  ButtonFunction.STOP),
+        Triple(KeyEvent.KEYCODE_DPAD_UP,     "D-Pad Up",      ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_DPAD_DOWN,   "D-Pad Down",    ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_DPAD_LEFT,   "D-Pad Left",    ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_DPAD_RIGHT,  "D-Pad Right",   ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_BUTTON_THUMBL, "Left Stick Click",  ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_BUTTON_THUMBR, "Right Stick Click", ButtonFunction.NONE),
+        Triple(KeyEvent.KEYCODE_BUTTON_START,  "Start/Menu",  ButtonFunction.NONE),
         Triple(KeyEvent.KEYCODE_BUTTON_SELECT, "Select",      ButtonFunction.NONE)
     )
 
     // ── All remappable axes ───────────────────────────────────────────
+    // Also cleared to NONE — same reasoning as ALL_BUTTONS above.
     val ALL_AXES = listOf(
         Triple(
             Pair(MotionEvent.AXIS_X, MotionEvent.AXIS_Y),
             "Left Stick",
-            AxisFunction.DRIVE
+            AxisFunction.NONE
         ),
         Triple(
             Pair(MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ),
             "Right Stick",
-            AxisFunction.PAN_TILT
+            AxisFunction.NONE
         ),
         Triple(
             Pair(MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y),
@@ -138,65 +140,20 @@ object ControllerMapping {
     )
 
     // ── Presets ───────────────────────────────────────────────────────
+    // Was 3 profiles (Default, Trigger Drive, D-Pad Drive) — the other
+    // two are removed entirely, not just left dead. They were already
+    // unreachable (the UI tab that let a user pick between them was
+    // removed earlier in this project's history), and now would fail
+    // to compile anyway, since they referenced enum values removed
+    // above. "Default" — the one actually still used, as the fallback
+    // for any fresh install with no saved mapping yet — now just
+    // reflects ALL_BUTTONS/ALL_AXES directly, both cleared to NONE.
     val PRESETS: List<ControllerProfile> = listOf(
-
         ControllerProfile("Default",
             buttons = ALL_BUTTONS.map { (kc, label, fn) -> ButtonMapping(kc, label, fn) },
             axes = ALL_AXES.map { (pair, label, fn) ->
                 AxisMapping(pair.first, pair.second, label, fn)
             }
-        ),
-
-        ControllerProfile("Trigger Drive",
-            buttons = ALL_BUTTONS.map { (kc, label, _) ->
-                ButtonMapping(kc, label, when(kc) {
-                    KeyEvent.KEYCODE_BUTTON_A    -> ButtonFunction.CAMERA_FLIP
-                    KeyEvent.KEYCODE_BUTTON_B    -> ButtonFunction.LED_CYCLE
-                    KeyEvent.KEYCODE_BUTTON_X    -> ButtonFunction.HORN_ON
-                    KeyEvent.KEYCODE_BUTTON_Y    -> ButtonFunction.FACE_CYCLE
-                    KeyEvent.KEYCODE_BUTTON_L1   -> ButtonFunction.SERVO_RESET
-                    KeyEvent.KEYCODE_BUTTON_L2   -> ButtonFunction.NONE  // used as drive axis
-                    KeyEvent.KEYCODE_BUTTON_R2   -> ButtonFunction.NONE  // used as drive axis
-                    KeyEvent.KEYCODE_DPAD_UP     -> ButtonFunction.TILT_UP
-                    KeyEvent.KEYCODE_DPAD_DOWN   -> ButtonFunction.TILT_DOWN
-                    KeyEvent.KEYCODE_DPAD_LEFT   -> ButtonFunction.PAN_LEFT
-                    KeyEvent.KEYCODE_DPAD_RIGHT  -> ButtonFunction.PAN_RIGHT
-                    KeyEvent.KEYCODE_BUTTON_R1   -> ButtonFunction.PHOTO
-                    KeyEvent.KEYCODE_BUTTON_THUMBL -> ButtonFunction.RECORD
-                    else -> ButtonFunction.NONE
-                })
-            },
-            axes = listOf(
-                // AXIS_GAS = right trigger (forward), AXIS_BRAKE = left trigger (reverse)
-                // X steering from left stick AXIS_X
-                AxisMapping(MotionEvent.AXIS_GAS, MotionEvent.AXIS_BRAKE, "Triggers (fwd/rev)", AxisFunction.TRIGGER_DRIVE),
-                AxisMapping(MotionEvent.AXIS_X, MotionEvent.AXIS_Y, "Left Stick (steer)", AxisFunction.STEER_ONLY),
-                AxisMapping(MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ, "Right Stick", AxisFunction.PAN_TILT)
-            )
-        ),
-
-        ControllerProfile("D-Pad Drive",
-            buttons = ALL_BUTTONS.map { (kc, label, _) ->
-                ButtonMapping(kc, label, when(kc) {
-                    KeyEvent.KEYCODE_BUTTON_X    -> ButtonFunction.HORN_ON
-                    KeyEvent.KEYCODE_BUTTON_B    -> ButtonFunction.LED_CYCLE
-                    KeyEvent.KEYCODE_BUTTON_Y    -> ButtonFunction.FACE_CYCLE
-                    KeyEvent.KEYCODE_BUTTON_A    -> ButtonFunction.CAMERA_FLIP
-                    KeyEvent.KEYCODE_BUTTON_L1   -> ButtonFunction.SERVO_RESET
-                    KeyEvent.KEYCODE_BUTTON_L2   -> ButtonFunction.PHOTO
-                    KeyEvent.KEYCODE_BUTTON_R2   -> ButtonFunction.RECORD
-                    KeyEvent.KEYCODE_DPAD_UP     -> ButtonFunction.NONE
-                    KeyEvent.KEYCODE_DPAD_DOWN   -> ButtonFunction.NONE
-                    KeyEvent.KEYCODE_DPAD_LEFT   -> ButtonFunction.NONE
-                    KeyEvent.KEYCODE_DPAD_RIGHT  -> ButtonFunction.NONE
-                    else -> ButtonFunction.NONE
-                })
-            },
-            axes = listOf(
-                AxisMapping(MotionEvent.AXIS_HAT_X, MotionEvent.AXIS_HAT_Y, "D-Pad (drive)", AxisFunction.DRIVE),
-                AxisMapping(MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ, "Right Stick (pan/tilt)", AxisFunction.PAN_TILT),
-                AxisMapping(MotionEvent.AXIS_X, MotionEvent.AXIS_Y, "Left Stick", AxisFunction.NONE)
-            )
         )
     )
 
