@@ -85,6 +85,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var lastBidirDriveSendTime = 0L
     private var lastBidirDriveSentSpeed = -1
     private var lastBidirDriveDirection = 0 // -1 reverse, 0 stopped, 1 forward
+    // For CUSTOM_PAN_TILT — tracks last-sent angle per servo separately
+    // (pan and tilt are independent SETA commands, unlike Bidirectional
+    // Drive's combined direction+speed write), debounced the same way.
+    private var lastPanTiltSendTime = 0L
+    private var lastPanSentAngle = -1
+    private var lastTiltSentAngle = -1
 
     // ── Sensitivity (loaded from prefs) ───────────────────────────────
     private var g8ServoStep  = 8.0f
@@ -644,6 +650,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     y
                 )
             }
+            AxisFunction.CUSTOM_PAN_TILT -> {
+                executeCustomPanTilt(mapping.customButtonId, mapping.customButtonId2, x, y)
+            }
         }
     }
 
@@ -850,6 +859,56 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         renderLiveButtons()
     }
 
+    // Drives two independent servo roles from one stick — pan (axisX)
+    // and tilt (axisY) simultaneously, each a direct position mapping
+    // (stick position IS the angle, 0-180), not incremental. Unlike
+    // Bidirectional Drive's combined direction+speed write, pan and
+    // tilt are two completely independent SETA commands — no state to
+    // combine, just send whichever one(s) actually changed, sharing
+    // one rate-limit window between them.
+    private fun executeCustomPanTilt(panButtonId: String?, tiltButtonId: String?, x: Float, y: Float) {
+        if (panButtonId == null || tiltButtonId == null) {
+            CarLogger.log("Controls", "Pan/Tilt axis isn't fully configured yet (needs both a pan and a tilt servo).")
+            return
+        }
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val buttons = controlButtonStorage.loadButtons(profileKey)
+        val panBtn = buttons.find { it.id == panButtonId }
+        val tiltBtn = buttons.find { it.id == tiltButtonId }
+        if (panBtn == null || tiltBtn == null) {
+            CarLogger.log("Controls", "One of the assigned Pan/Tilt servos no longer exists (was it deleted?).")
+            return
+        }
+
+        val panAngle = ((x + 1f) / 2f * 180f).toInt().coerceIn(0, 180)
+        val tiltAngle = ((y + 1f) / 2f * 180f).toInt().coerceIn(0, 180)
+
+        val now = System.currentTimeMillis()
+        val panChanged = panAngle != lastPanSentAngle
+        val tiltChanged = tiltAngle != lastTiltSentAngle
+        if (!panChanged && !tiltChanged) return
+        if ((now - lastPanTiltSendTime) < SERVO_SEND_INTERVAL_MS) return
+        lastPanTiltSendTime = now
+
+        if (panChanged) {
+            lastPanSentAngle = panAngle
+            controlButtonStorage.setValue(profileKey, panBtn.id, panAngle)
+            com.espad32.controller.controls.DeviceCommand.sendSetAngle(panBtn.roleKey, panAngle) { response ->
+                CarLogger.log("Controls", response ?: "\"${panBtn.label}\": no response (check connection)")
+            }
+        }
+        if (tiltChanged) {
+            lastTiltSentAngle = tiltAngle
+            controlButtonStorage.setValue(profileKey, tiltBtn.id, tiltAngle)
+            com.espad32.controller.controls.DeviceCommand.sendSetAngle(tiltBtn.roleKey, tiltAngle) { response ->
+                CarLogger.log("Controls", response ?: "\"${tiltBtn.label}\": no response (check connection)")
+            }
+        }
+        renderLiveButtons()
+    }
+
     // ── Joysticks ─────────────────────────────────────────────────────
     private fun setupJoysticks() {
         // Both on-screen joysticks previously bypassed ControllerMapping
@@ -878,18 +937,22 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             updateDrivingActivityState(false)
         }
 
-        // Right stick (pan/tilt) is NOT yet fixed — this is a genuinely
-        // separate, larger piece of work than the left stick's fix
-        // above. Pan/tilt needs BOTH axes simultaneously nudging TWO
-        // separate servo roles at once, a shape neither CUSTOM_PWM
-        // (single axis, one value) nor CUSTOM_BIDIRECTIONAL_DRIVE (one
-        // axis, direction+speed) covers — would need a new axis
-        // function built specifically for it, the same way
-        // CUSTOM_BIDIRECTIONAL_DRIVE was built for the drive case.
-        // Left as a genuine no-op for now rather than keep sending a
-        // confirmed-dead CMD_CAMERA command.
-        joystickRight.onMoved = { _, _ -> }
-        joystickRight.onReleased = { }
+        // Right stick (pan/tilt) — now fixed the same way the left
+        // stick was, using the new CUSTOM_PAN_TILT axis function built
+        // specifically for this shape (two axes, two independent servo
+        // roles at once — neither CUSTOM_PWM nor
+        // CUSTOM_BIDIRECTIONAL_DRIVE covers that). No longer sending
+        // the confirmed-dead CMD_CAMERA command.
+        val rightStickMapping = ControllerMapping.axes.find { it.label == "Right Stick" }
+        joystickRight.onMoved = { x, y ->
+            rightStickMapping?.let { executeAxisMapping(it, x, y) }
+        }
+        joystickRight.onReleased = {
+            // Recenters both servos to 90° — avoids a mismatch where
+            // the joystick knob visually snaps back to center but the
+            // camera stays wherever it last pointed.
+            rightStickMapping?.let { executeAxisMapping(it, 0f, 0f) }
+        }
 
         setupWidgetRelocation(joystickLeft, "layout_joystick_left")
         setupWidgetRelocation(joystickRight, "layout_joystick_right")

@@ -219,6 +219,13 @@ class ControllerMappingActivity : AppCompatActivity() {
                 "→ ${fwd.label}/${rev.label} + ${spd.label}"
             else "Bidirectional Drive (not fully set)"
         }
+        if (mapping.function == AxisFunction.CUSTOM_PAN_TILT) {
+            val pan = buttons.find { it.id == mapping.customButtonId }
+            val tilt = buttons.find { it.id == mapping.customButtonId2 }
+            return if (pan != null && tilt != null)
+                "→ ${pan.label} / ${tilt.label}"
+            else "Pan/Tilt (not fully set)"
+        }
         return mapping.function.label
     }
 
@@ -242,6 +249,8 @@ class ControllerMappingActivity : AppCompatActivity() {
                     showCustomPwmPicker(index, mapping)
                 } else if (selected == AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE) {
                     showBidirectionalDrivePicker(index, mapping)
+                } else if (selected == AxisFunction.CUSTOM_PAN_TILT) {
+                    showPanTiltPicker(index, mapping)
                 } else {
                     ControllerMapping.updateAxis(index, selected, this)
                     showTab(1)
@@ -341,6 +350,58 @@ class ControllerMappingActivity : AppCompatActivity() {
                             }
                             .setNegativeButton("Cancel", null)
                             .show()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // Two-step picker for Pan/Tilt — needs a "pan" servo slider and a
+    // "tilt" servo slider, chained the same way the other multi-step
+    // pickers here already work. Both filtered to SLIDER-type Controls
+    // buttons only (same as the other pickers' speed-slider step) —
+    // this doesn't distinguish a SERVO-type slider from a PWM-type one
+    // any more strictly than CUSTOM_PWM/Bidirectional Drive's own
+    // pickers already do, so picking a mismatched button here carries
+    // the same pre-existing risk as those, not a new one introduced
+    // by this function specifically.
+    private fun showPanTiltPicker(index: Int, mapping: AxisMapping) {
+        val profileKey = com.espad32.controller.controls.ActiveProfile.get(
+            this, com.espad32.controller.pinmapper.Profiles.TRAIN.key
+        )
+        val allButtons = com.espad32.controller.controls.ControlButtonStorage(this).loadButtons(profileKey)
+        val sliderButtons = allButtons.filter { it.controlType == com.espad32.controller.controls.ControlType.SLIDER }
+
+        if (sliderButtons.size < 2) {
+            android.widget.Toast.makeText(
+                this,
+                "Needs at least 2 slider-type Controls buttons (one per servo) — add them in Controls first.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val sliderLabels = sliderButtons.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Step 1 of 2 — Pan servo (left/right)")
+            .setItems(sliderLabels) { _, panIndex ->
+                val panBtn = sliderButtons[panIndex]
+                AlertDialog.Builder(this)
+                    .setTitle("Step 2 of 2 — Tilt servo (up/down)")
+                    .setItems(sliderLabels) { _, tiltIndex ->
+                        val tiltBtn = sliderButtons[tiltIndex]
+                        if (tiltBtn.id == panBtn.id) {
+                            android.widget.Toast.makeText(this, "Pan and tilt need to be different servos.", android.widget.Toast.LENGTH_LONG).show()
+                            return@setItems
+                        }
+                        ControllerMapping.updateAxis(
+                            index, AxisFunction.CUSTOM_PAN_TILT, this,
+                            customButtonId = panBtn.id,
+                            customButtonId2 = tiltBtn.id
+                        )
+                        showTab(1)
                     }
                     .setNegativeButton("Cancel", null)
                     .show()

@@ -49,7 +49,19 @@ enum class AxisFunction(val label: String) {
     // one PWM slider — it has no concept of a paired direction role
     // that should flip based on which side of center the axis is on.
     // See customForwardButtonId/customReverseButtonId below.
-    CUSTOM_BIDIRECTIONAL_DRIVE("Bidirectional Drive (fwd/rev + speed)")
+    CUSTOM_BIDIRECTIONAL_DRIVE("Bidirectional Drive (fwd/rev + speed)"),
+    // Drives TWO servo roles simultaneously from ONE stick — axisX
+    // maps directly to a "pan" servo's angle, axisY maps directly to a
+    // "tilt" servo's angle, both 0-180. A genuinely different shape
+    // from either function above: CUSTOM_PWM is one axis to one value,
+    // CUSTOM_BIDIRECTIONAL_DRIVE is one axis to direction+speed, this
+    // is both axes at once to two independent servo roles. Direct
+    // position mapping (stick position IS the angle), not incremental/
+    // rate-based — simpler and more predictable than "hold to keep
+    // moving," and consistent with how CUSTOM_PWM already maps stick
+    // position directly to a value. See customButtonId (pan) and
+    // customButtonId2 (tilt) below.
+    CUSTOM_PAN_TILT("Custom Pan/Tilt (2 servos)")
 }
 
 // ── A single button mapping ───────────────────────────────────────────
@@ -71,15 +83,19 @@ data class AxisMapping(
     val invertX: Boolean = false,
     val invertY: Boolean = false,
     // Only used when function == CUSTOM_PWM (the speed slider it
-    // drives) or CUSTOM_BIDIRECTIONAL_DRIVE (also the speed slider,
-    // same meaning — the other two roles for that function are below).
+    // drives), CUSTOM_BIDIRECTIONAL_DRIVE (also the speed slider, same
+    // meaning — the other two roles for that function are below), or
+    // CUSTOM_PAN_TILT (the "pan" servo role — axisX).
     val customButtonId: String? = null,
     // Only used when function == CUSTOM_BIDIRECTIONAL_DRIVE — ids of
     // TOGGLE-type Controls buttons (e.g. "Motor direction A"/"Motor
     // direction B") that get set on/off based on which side of center
     // the axis is on.
     val customForwardButtonId: String? = null,
-    val customReverseButtonId: String? = null
+    val customReverseButtonId: String? = null,
+    // Only used when function == CUSTOM_PAN_TILT — the "tilt" servo
+    // role (axisY). Paired with customButtonId above (pan, axisX).
+    val customButtonId2: String? = null
 )
 
 // ── Preset profiles ───────────────────────────────────────────────────
@@ -226,13 +242,15 @@ object ControllerMapping {
 
     fun updateAxis(
         index: Int, function: AxisFunction, context: Context, customButtonId: String? = null,
-        customForwardButtonId: String? = null, customReverseButtonId: String? = null
+        customForwardButtonId: String? = null, customReverseButtonId: String? = null,
+        customButtonId2: String? = null
     ) {
         _axes[index] = _axes[index].copy(
             function = function,
             customButtonId = customButtonId,
             customForwardButtonId = customForwardButtonId,
-            customReverseButtonId = customReverseButtonId
+            customReverseButtonId = customReverseButtonId,
+            customButtonId2 = customButtonId2
         )
         saveToPrefs(context)
     }
