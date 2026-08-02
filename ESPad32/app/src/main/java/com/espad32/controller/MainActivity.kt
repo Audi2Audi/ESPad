@@ -61,16 +61,19 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var senderJob: Job? = null
 
     // ── Gamepad / motion state ────────────────────────────────────────
-    private var lastLeftX = 0f
-    private var lastLeftY = 0f
+    // Was also home to lastLeftX/lastLeftY/MOTOR_MAX/MOTOR_INTERVAL_MS —
+    // removed, only ever used by the now-deleted CMD_MOTOR polling loop.
     private val DEADZONE = 0.08f
-    private val MOTOR_MAX = 4095
-    private val MOTOR_INTERVAL_MS = 50L
 
     // ── Servo state ───────────────────────────────────────────────────
-    private var servo1Angle = 90.0f
-    private var servo2Angle = 90.0f
-    private var lastServoSendTime = 0L
+    // Was also home to servo1Angle/servo2Angle/lastServoSendTime —
+    // removed, only ever used by the right joystick's pan/tilt code
+    // (now a no-op pending its own proper fix) and the dead
+    // PAN_LEFT/PAN_RIGHT/TILT_UP/TILT_DOWN/etc button functions removed
+    // earlier. SERVO_SEND_INTERVAL_MS itself stays — still genuinely
+    // used as a shared debounce interval by CUSTOM_PWM and
+    // CUSTOM_BIDIRECTIONAL_DRIVE, unrelated to the servo-specific state
+    // removed here despite the shared naming.
     private val SERVO_SEND_INTERVAL_MS = 80L
     private var lastCustomPwmSendTime = 0L
     private var lastCustomPwmSentValue = -1
@@ -101,10 +104,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     // ── Jobs ──────────────────────────────────────────────────────────
     private var batteryJob: Job? = null
-    private var motorJob:   Job? = null
 
-    // ── Motor auto-stop ───────────────────────────────────────────────
-    private var lastMotorCmdTime = 0L
+    // ── Driving activity tracking (for auto camera-resolution switching) ──
+    // Was also "Motor auto-stop" and home to motorJob/lastMotorCmdTime —
+    // removed, only ever used by the now-deleted CMD_MOTOR polling loop.
+    // lastMotorWasZero itself is still very much used, just re-anchored
+    // to the joystick's own movement state now (see
+    // updateDrivingActivityState()) rather than to that dead loop.
     private var lastMotorWasZero = true
     private var highResActive = false
     private val highResHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -198,7 +204,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         // above via cameraControls' own buttons; Camera Flip got a new
         // listener there too; View Log moved into Settings' Theme tab.
 
-        startMotorLoop()
+        // startMotorLoop() removed — was the dead CMD_MOTOR polling
+        // loop; the left joystick now drives directly through
+        // executeAxisMapping() on each move instead of a timer polling
+        // stale state.
         startSenderLoop()
     }
 
@@ -544,41 +553,31 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     // ── Motor loop ────────────────────────────────────────────────────
-    private fun startMotorLoop() {
-        motorJob = scope.launch {
-            while (isActive) { sendMotorFromStick(); delay(MOTOR_INTERVAL_MS) }
-        }
-    }
-
-    private fun sendMotorFromStick() {
-        val y = applyDeadzone(lastLeftY)
-        val x = applyDeadzone(lastLeftX)
-        val curvedY = if (speedCurveExpo) Math.signum(y)*y*y else y
-        val curvedX = if (speedCurveExpo) Math.signum(x)*x*x else x
-        val baseSpeed  = (-curvedY * MOTOR_MAX * g8MotorScale).toInt()
-        val turnOffset = (curvedX * 1600 * g8MotorScale).toInt()
-        val left  = (baseSpeed + turnOffset).coerceIn(-MOTOR_MAX, MOTOR_MAX)
-        val right = (baseSpeed - turnOffset).coerceIn(-MOTOR_MAX, MOTOR_MAX)
-        if (left != 0 || right != 0) {
-            lastMotorCmdTime = System.currentTimeMillis()
+    // Was startMotorLoop()/sendMotorFromStick(), reading lastLeftX/
+    // lastLeftY and sending CMD_MOTOR on a timer — removed entirely,
+    // not left dead, now that the left joystick drives through
+    // executeAxisMapping() directly instead of writing to those
+    // variables for a separate loop to poll. But that old function
+    // also did something else, worth preserving: tracking whether the
+    // car is actively being driven to auto-switch the camera to a
+    // higher resolution when idle. Re-anchored here to the joystick's
+    // own movement state directly, decoupled from whatever specific
+    // drive command ends up being sent — so this keeps working
+    // correctly regardless of which axis function is assigned to the
+    // stick.
+    private fun updateDrivingActivityState(isMoving: Boolean) {
+        if (isMoving) {
             if (lastMotorWasZero) {
                 lastMotorWasZero = false
-                // Cancel pending high-res switch
                 highResHandler.removeCallbacks(switchToHighResRunnable)
-                // Switch back to SVGA immediately if we were in high-res
                 if (highResActive) {
                     highResActive = false
                     enqueue("CMD_CAM_RES#SVGA\n")
                     CarLogger.log("Camera", "Switched to SVGA (driving)")
                 }
             }
-            enqueue("CMD_MOTOR#${left}#${left}#${right}#${right}\n")
         } else if (!lastMotorWasZero) {
-            // Send stop immediately on first zero reading
             lastMotorWasZero = true
-            lastMotorCmdTime = 0
-            enqueue("CMD_MOTOR#0#0#0#0\n")
-            // Schedule high-res after 2 seconds of idle
             highResHandler.removeCallbacks(switchToHighResRunnable)
             highResHandler.postDelayed(switchToHighResRunnable, 2000)
         }
@@ -591,47 +590,61 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             ControllerMapping.axes.forEach { mapping ->
                 val rawX = event.getAxisValue(mapping.axisX)
                 val rawY = event.getAxisValue(mapping.axisY)
-                val x = applyDeadzone(if (mapping.invertX) -rawX else rawX)
-                val y = applyDeadzone(if (mapping.invertY) -rawY else rawY)
-                when (mapping.function) {
-                    AxisFunction.NONE -> {}
-                    AxisFunction.CUSTOM_PWM -> {
-                        // Single-axis only (axisY ignored). Raw axis
-                        // values are typically -1..1 for sticks or 0..1
-                        // for triggers — this maps the -1..1 case
-                        // correctly to 0-255; a trigger-only axis will
-                        // only span the upper half of that range, which
-                        // is a known rough edge worth revisiting once a
-                        // real trigger axis is tested (see
-                        // PIN_MAPPER_ROADMAP.md).
-                        val normalized = ((rawX + 1f) / 2f * 255f).toInt().coerceIn(0, 255)
-                        val now = System.currentTimeMillis()
-                        if (normalized != lastCustomPwmSentValue &&
-                            (now - lastCustomPwmSendTime) >= SERVO_SEND_INTERVAL_MS) {
-                            lastCustomPwmSendTime = now
-                            lastCustomPwmSentValue = normalized
-                            executeCustomPwmAxis(mapping.customButtonId, normalized)
-                        }
-                    }
-                    AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE -> {
-                        // Uses the VERTICAL (Y) axis specifically —
-                        // "up/down" is the whole point of this function,
-                        // unlike CUSTOM_PWM which is horizontal-only.
-                        // Android convention: pushed up typically
-                        // reports a NEGATIVE Y (screen-coordinate-style),
-                        // so negative = forward, positive = reverse.
-                        executeCustomBidirectionalDrive(
-                            mapping.customForwardButtonId,
-                            mapping.customReverseButtonId,
-                            mapping.customButtonId,
-                            y
-                        )
-                    }
-                }
+                executeAxisMapping(mapping, rawX, rawY)
             }
             return true
         }
         return super.onGenericMotionEvent(event)
+    }
+
+    // Extracted from onGenericMotionEvent so the on-screen joysticks
+    // can share the exact same, already-proven dispatch logic instead
+    // of the hardcoded CMD_MOTOR/CMD_CAMERA sends they used before —
+    // those sent commands this firmware has never understood, while
+    // this path (confirmed working directly — CUSTOM_PWM was tested
+    // controlling an LED's brightness accurately) goes through real
+    // Pin Mapper roles instead. Takes raw, un-deadzoned/un-inverted
+    // axis values — deadzone and invert are applied here, once, so
+    // both callers get identical behavior rather than each needing to
+    // remember to apply them.
+    private fun executeAxisMapping(mapping: AxisMapping, rawX: Float, rawY: Float) {
+        val x = applyDeadzone(if (mapping.invertX) -rawX else rawX)
+        val y = applyDeadzone(if (mapping.invertY) -rawY else rawY)
+        when (mapping.function) {
+            AxisFunction.NONE -> {}
+            AxisFunction.CUSTOM_PWM -> {
+                // Single-axis only (axisY ignored). Raw axis
+                // values are typically -1..1 for sticks or 0..1
+                // for triggers — this maps the -1..1 case
+                // correctly to 0-255; a trigger-only axis will
+                // only span the upper half of that range, which
+                // is a known rough edge worth revisiting once a
+                // real trigger axis is tested (see
+                // PIN_MAPPER_ROADMAP.md).
+                val normalized = ((rawX + 1f) / 2f * 255f).toInt().coerceIn(0, 255)
+                val now = System.currentTimeMillis()
+                if (normalized != lastCustomPwmSentValue &&
+                    (now - lastCustomPwmSendTime) >= SERVO_SEND_INTERVAL_MS) {
+                    lastCustomPwmSendTime = now
+                    lastCustomPwmSentValue = normalized
+                    executeCustomPwmAxis(mapping.customButtonId, normalized)
+                }
+            }
+            AxisFunction.CUSTOM_BIDIRECTIONAL_DRIVE -> {
+                // Uses the VERTICAL (Y) axis specifically —
+                // "up/down" is the whole point of this function,
+                // unlike CUSTOM_PWM which is horizontal-only.
+                // Android convention: pushed up typically
+                // reports a NEGATIVE Y (screen-coordinate-style),
+                // so negative = forward, positive = reverse.
+                executeCustomBidirectionalDrive(
+                    mapping.customForwardButtonId,
+                    mapping.customReverseButtonId,
+                    mapping.customButtonId,
+                    y
+                )
+            }
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -839,22 +852,43 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     // ── Joysticks ─────────────────────────────────────────────────────
     private fun setupJoysticks() {
+        // Both on-screen joysticks previously bypassed ControllerMapping
+        // entirely, hardcoded to send CMD_MOTOR (left) / CMD_CAMERA
+        // (right) directly — commands this firmware has never
+        // understood, confirmed dead the same way the physical
+        // gamepad's old DRIVE/PAN_TILT axis functions were. The left
+        // stick now routes through the exact same "Left Stick" axis
+        // mapping and executeAxisMapping() dispatch a physical gamepad
+        // already uses — same mechanism already confirmed working
+        // directly (CUSTOM_PWM tested controlling an LED's brightness
+        // accurately). Looked up by label since that's the stable
+        // identifier ControllerMappingActivity's UI already shows the
+        // person, rather than duplicating axis-constant matching here.
+        val leftStickMapping = ControllerMapping.axes.find { it.label == "Left Stick" }
         joystickLeft.onMoved = { x, y ->
-            lastLeftX = x * osMotorScale.coerceIn(0.1f, 1.0f)
-            lastLeftY = y * osMotorScale.coerceIn(0.1f, 1.0f)
+            leftStickMapping?.let { executeAxisMapping(it, x, y) }
+            updateDrivingActivityState(applyDeadzone(x) != 0f || applyDeadzone(y) != 0f)
         }
-        joystickLeft.onReleased = { lastLeftX = 0f; lastLeftY = 0f }
-        joystickRight.onMoved = { x, y ->
-            val now = System.currentTimeMillis()
-            val newS1 = (servo1Angle - x * osServoStep).coerceIn(0f, 180f)
-            val newS2 = (servo2Angle + y * osServoStep).coerceIn(80f, 180f)
-            if ((Math.abs(newS1-servo1Angle) >= 1f || Math.abs(newS2-servo2Angle) >= 1f)
-                && (now - lastServoSendTime) >= SERVO_SEND_INTERVAL_MS) {
-                servo1Angle = newS1; servo2Angle = newS2
-                lastServoSendTime = now
-                enqueue("CMD_CAMERA#${servo1Angle.toInt()}#${servo2Angle.toInt()}\n")
-            }
+        joystickLeft.onReleased = {
+            // Returns to center, same as releasing a real gamepad
+            // stick — lets whatever function is assigned (e.g.
+            // CUSTOM_BIDIRECTIONAL_DRIVE) handle "stopped" the same
+            // way it already does for a physical stick recentering.
+            leftStickMapping?.let { executeAxisMapping(it, 0f, 0f) }
+            updateDrivingActivityState(false)
         }
+
+        // Right stick (pan/tilt) is NOT yet fixed — this is a genuinely
+        // separate, larger piece of work than the left stick's fix
+        // above. Pan/tilt needs BOTH axes simultaneously nudging TWO
+        // separate servo roles at once, a shape neither CUSTOM_PWM
+        // (single axis, one value) nor CUSTOM_BIDIRECTIONAL_DRIVE (one
+        // axis, direction+speed) covers — would need a new axis
+        // function built specifically for it, the same way
+        // CUSTOM_BIDIRECTIONAL_DRIVE was built for the drive case.
+        // Left as a genuine no-op for now rather than keep sending a
+        // confirmed-dead CMD_CAMERA command.
+        joystickRight.onMoved = { _, _ -> }
         joystickRight.onReleased = { }
 
         setupWidgetRelocation(joystickLeft, "layout_joystick_left")
@@ -1731,7 +1765,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         // Only fully cancel if actually finishing (not config change)
         highResHandler.removeCallbacks(switchToHighResRunnable)
         if (isFinishing) {
-            senderJob?.cancel(); motorJob?.cancel(); batteryJob?.cancel()
+            senderJob?.cancel(); batteryJob?.cancel()
             connectionScope.cancel()
             tcpClient?.disconnect(); cameraStream?.stop()
         }
