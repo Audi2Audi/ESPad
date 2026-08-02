@@ -84,6 +84,63 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Left joystick fixed to drive through real axis mappings,
+      instead of a dead `CMD_MOTOR` polling loop** (app-only). Direct
+      follow-up to the ButtonFunction/AxisFunction cleanup's flagged
+      finding — the on-screen joysticks bypassed `ControllerMapping`
+      entirely, with the left stick's whole drive loop
+      (`sendMotorFromStick()`, on a timer) sending `CMD_MOTOR`. A
+      useful data point came with the request to fix this: `CUSTOM_PWM`
+      had separately been confirmed working correctly (controlled an
+      LED's brightness accurately from a stick), meaning the axis-
+      mapping infrastructure itself was never the problem — only the
+      joysticks bypassing it was.
+      - Extracted `onGenericMotionEvent`'s per-mapping dispatch into a
+        reusable `executeAxisMapping()` function.
+      - **Left joystick now looks up its "Left Stick" `AxisMapping`
+        from `ControllerMapping.axes`** (the exact same slot a
+        physical gamepad already uses) and calls this same function
+        directly, on every move and on release. `CUSTOM_BIDIRECTIONAL_
+        DRIVE` (or whatever's assigned) now actually works from the
+        left stick — zero new app-side capability needed, just
+        correct wiring reusing what already existed and was already
+        proven.
+      - **Removed the entire dead mechanism this replaced, not left
+        behind**: `startMotorLoop()`, `sendMotorFromStick()`,
+        `lastLeftX`/`lastLeftY`, `motorJob`, `MOTOR_MAX`,
+        `MOTOR_INTERVAL_MS`, `lastMotorCmdTime`.
+      - **Caught and preserved a genuinely separate feature that same
+        dead code also handled**: auto-switching the camera to a
+        higher resolution when idle. Re-anchored to the joystick's own
+        movement state directly via a new
+        `updateDrivingActivityState()` function, decoupled from
+        whatever specific drive command ends up being sent — would
+        have silently regressed (always seeing "idle," even while
+        actively driving) if this side effect hadn't been noticed and
+        carried forward deliberately.
+      - **Right joystick (pan/tilt) intentionally left as a no-op for
+        now**, not fixed in this same pass — its `CMD_CAMERA` send was
+        removed (stopped sending a confirmed-dead command), but
+        properly fixing it needs a genuinely new axis function: two
+        axes driving two servo roles *simultaneously*, a shape neither
+        `CUSTOM_PWM` (one axis, one value) nor
+        `CUSTOM_BIDIRECTIONAL_DRIVE` (one axis, direction+speed)
+        covers. Worth its own focused pass, the same way
+        `CUSTOM_BIDIRECTIONAL_DRIVE` itself was built specifically for
+        the drive case rather than forced into an existing shape.
+      - Also removed `servo1Angle`/`servo2Angle`/`lastServoSendTime`,
+        only ever used by the now-inert right-stick code and the
+        earlier-removed dead button functions. **Left `osServoStep`/
+        `g8ServoStep` alone for now** — these sensitivity settings are
+        tied to Settings UI sliders not audited in this pass; they're
+        currently inert (nothing reads them to affect behavior since
+        their only consumer, the old pan/tilt code, is gone) but
+        removing them properly means checking what that UI exposure
+        looks like first, worth its own small look rather than
+        widening this pass further.
+
+
+
 - [x] **Removed 15 dead `ButtonFunction` values and 4 dead
       `AxisFunction` values, cleared defaults to blank** (app-only).
       Raised as a direct question — do all these functions remain
