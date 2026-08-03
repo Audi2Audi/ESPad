@@ -182,16 +182,17 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val cameraControls = findViewById<android.view.ViewGroup>(R.id.cameraControls)
         cameraControls.isClickable = true
         cameraControls.setOnClickListener { }
-        findViewById<android.widget.Button>(R.id.btnPhotoOverlay).setOnClickListener { takePhoto() }
-        findViewById<android.widget.Button>(R.id.btnRecordOverlay).setOnClickListener { toggleRecording() }
-        findViewById<android.widget.Button>(R.id.btnSettingsOverlay).setOnClickListener { showSettings() }
-        findViewById<android.widget.Button>(R.id.btnPinMapperOverlay).setOnClickListener {
+        applySavedLayoutOffset(cameraControls, "layout_camera_controls")
+        attachRelocatableClick(findViewById<android.widget.Button>(R.id.btnPhotoOverlay), cameraControls, "layout_camera_controls") { takePhoto() }
+        attachRelocatableClick(findViewById<android.widget.Button>(R.id.btnRecordOverlay), cameraControls, "layout_camera_controls") { toggleRecording() }
+        attachRelocatableClick(findViewById<android.widget.Button>(R.id.btnSettingsOverlay), cameraControls, "layout_camera_controls") { showSettings() }
+        attachRelocatableClick(findViewById<android.widget.Button>(R.id.btnPinMapperOverlay), cameraControls, "layout_camera_controls") {
             startActivity(Intent(this@MainActivity, com.espad32.controller.pinmapper.PinMapperActivity::class.java))
         }
-        findViewById<android.widget.Button>(R.id.btnCameraFlipOverlay).setOnClickListener {
+        attachRelocatableClick(findViewById<android.widget.Button>(R.id.btnCameraFlipOverlay), cameraControls, "layout_camera_controls") {
             cameraStream?.let { it.flipped = !it.flipped }
         }
-        findViewById<android.widget.Button>(R.id.btnControlsOverlay).setOnClickListener {
+        attachRelocatableClick(findViewById<android.widget.Button>(R.id.btnControlsOverlay), cameraControls, "layout_camera_controls") {
             startActivity(Intent(this@MainActivity, com.espad32.controller.controls.ControlsActivity::class.java))
         }
 
@@ -1083,6 +1084,65 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         view.translationY = y
     }
 
+    // For buttons that need BOTH a normal click action AND long-press-
+    // drag relocation, sharing one common drag target — distinct from
+    // the gamepad buttons' own pattern (which fires immediately on
+    // ACTION_DOWN, since real-time gamepad response needs that), and
+    // distinct from JoystickView's built-in handling (setupWidgetRelocation
+    // only wires up JoystickView instances specifically). This fires
+    // onClick on ACTION_UP instead — only for a genuine quick tap, not
+    // when the hold turned into a drag — which is the right semantic
+    // for a one-shot action button rather than a press/release control.
+    private fun attachRelocatableClick(button: android.widget.Button, dragTarget: android.view.View, prefsKey: String, onClick: () -> Unit) {
+        var relocateMode = false
+        var downRawX = 0f; var downRawY = 0f
+        var baseX = 0f; var baseY = 0f
+        val stationaryThresholdPx = 12f * resources.displayMetrics.density
+        val longPressRunnable = Runnable {
+            if (!relocateMode) {
+                relocateMode = true
+                button.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                baseX = dragTarget.translationX
+                baseY = dragTarget.translationY
+                CarLogger.log("Main", "Hold and drag to reposition — release to save.")
+            }
+        }
+        button.setOnTouchListener { v, event ->
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downRawX = event.rawX; downRawY = event.rawY
+                    relocateMode = false
+                    v.postDelayed(longPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
+                    true
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (relocateMode) {
+                        val (clampedX, clampedY) = clampOffset(dragTarget, baseX + (event.rawX - downRawX), baseY + (event.rawY - downRawY))
+                        dragTarget.translationX = clampedX
+                        dragTarget.translationY = clampedY
+                    } else {
+                        val dx = event.rawX - downRawX; val dy = event.rawY - downRawY
+                        if (kotlin.math.sqrt(dx * dx + dy * dy) > stationaryThresholdPx) {
+                            v.removeCallbacks(longPressRunnable) // real movement — not a hold, cancel relocate detection
+                        }
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    v.removeCallbacks(longPressRunnable)
+                    if (relocateMode) {
+                        saveLayoutOffset(prefsKey, dragTarget.translationX, dragTarget.translationY)
+                        CarLogger.log("Main", "Position saved.")
+                    } else if (event.action == android.view.MotionEvent.ACTION_UP) {
+                        onClick() // genuine quick tap, not a hold that became a drag
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
     // Wires a JoystickView's relocate callbacks (see JoystickView.kt) to
     // actually move the view via translationX/Y, with clamping and
     // persistence — the joystick handles its own long-press-without-
@@ -1121,6 +1181,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         // the current baseline default actually is.
         applySavedLayoutOffset(joystickLeft, "layout_joystick_left")
         applySavedLayoutOffset(joystickRight, "layout_joystick_right")
+        applySavedLayoutOffset(findViewById<android.view.View>(R.id.cameraControls), "layout_camera_controls")
         // The gamepad cluster now has many independently-positioned
         // widgets (the diamond group + 4 shoulders + 4 utility buttons)
         // rather than one — re-rendering it from scratch after clearing
@@ -1140,7 +1201,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val prefs = getSharedPreferences(LAYOUT_PREFS_NAME, MODE_PRIVATE)
         val density = resources.displayMetrics.density
         val keys = listOf(
-            "layout_joystick_left", "layout_joystick_right",
+            "layout_joystick_left", "layout_joystick_right", "layout_camera_controls",
             "layout_gamepad_diamond", "layout_gamepad_l1", "layout_gamepad_l2",
             "layout_gamepad_r1", "layout_gamepad_r2", "layout_gamepad_select",
             "layout_gamepad_l3", "layout_gamepad_r3", "layout_gamepad_start"
