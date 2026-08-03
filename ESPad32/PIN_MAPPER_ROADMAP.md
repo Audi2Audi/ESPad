@@ -84,6 +84,38 @@ originally written, now corrected above for motors/servos):**
 
 ## Status: done so far
 
+- [x] **Compact icon stack (`cameraControls`) is now draggable/
+      repositionable** (app-only), extending the existing "hold and
+      drag to reposition" system rather than a new interaction model —
+      matches how joysticks and the gamepad button diamond already
+      work.
+      - Neither existing mechanism fit directly: `cameraControls` is a
+        container with several individually-clickable buttons, not a
+        single button (the gamepad's own pattern) and not a
+        `JoystickView` (`setupWidgetRelocation` only wires up
+        `JoystickView` instances specifically).
+      - New `attachRelocatableClick()` helper fires its click action on
+        `ACTION_UP` for a genuine quick tap, but on long-press-hold-
+        without-movement enters relocate mode and drags a shared
+        target instead — the right semantic for a one-shot action
+        button (take photo, open settings, etc), unlike the gamepad
+        buttons' own pattern which needs immediate `ACTION_DOWN`
+        response for real-time control.
+      - All six of `cameraControls`' buttons use this now, all sharing
+        `cameraControls` itself as the drag target — any of them being
+        long-pressed and dragged moves the whole stack together, same
+        "shared dragTarget" pattern the gamepad's Y/X/B/A diamond
+        already uses.
+      - Position persisted under `"layout_camera_controls"`, applied on
+        startup, included in `resetCustomLayout()`'s reset list and
+        `exportCurrentLayout()`'s logged keys — no entry needed in
+        `DEFAULT_LAYOUT_OFFSETS_DP` itself, since its correct default
+        (0,0 — no offset, matching its current fixed position) is
+        exactly what `loadLayoutOffset()`'s existing fallback already
+        produces for any key not explicitly listed there.
+
+
+
 - [x] **Compact icon stack (`cameraControls`) now has its own auto-hide
       timer** (app-only). Confirmed directly: the drawer already
       auto-hid into the compact icons after 10 seconds, but the icons
